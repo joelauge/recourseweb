@@ -34,19 +34,19 @@ export default function WaitlistModal({ isOpen, onClose }) {
           <div className="modal-logo">
             <LogoSVG height={48} />
           </div>
-          
+
           <h2 className="modal-title">Capacity Reached</h2>
           <p className="modal-desc">
-            We're currently not admitting new users to ensure the highest performance for our existing members. 
+            We're currently not admitting new users to ensure the highest performance for our existing members.
             Sign up for updates to be the first to know when new slots open!
           </p>
 
           {!submitted ? (
             <form className="waitlist-form" onSubmit={handleSubmit}>
               <div className="input-group">
-                <input 
-                  type="email" 
-                  placeholder="Enter your email" 
+                <input
+                  type="email"
+                  placeholder="Enter your email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -55,7 +55,7 @@ export default function WaitlistModal({ isOpen, onClose }) {
                   Notify Me
                 </button>
               </div>
-              <p className="modal-footer-text">Join 12,000+ others on the waitlist.</p>
+              <p className="modal-footer-text">Join the waitlist.</p>
             </form>
           ) : (
             <div className="success-message">
