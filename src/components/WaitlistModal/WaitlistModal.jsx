@@ -4,19 +4,36 @@ import { LogoSVG } from '../Icons';
 export default function WaitlistModal({ isOpen, onClose }) {
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (email) {
+    setError('');
+    setLoading(true);
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/waitlist`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Something went wrong');
+
       setSubmitted(true);
-      // In a real app, you'd send this to your backend/waitlist service
       setTimeout(() => {
         onClose();
         setSubmitted(false);
         setEmail('');
-      }, 3000);
+      }, 5000);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -41,6 +58,8 @@ export default function WaitlistModal({ isOpen, onClose }) {
             Sign up for updates to be the first to know when new slots open!
           </p>
 
+          {error && <p className="modal-error">{error}</p>}
+
           {!submitted ? (
             <form className="waitlist-form" onSubmit={handleSubmit}>
               <div className="input-group">
@@ -49,10 +68,11 @@ export default function WaitlistModal({ isOpen, onClose }) {
                   placeholder="Enter your email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  disabled={loading}
                   required
                 />
-                <button type="submit" className="btn-primary">
-                  Notify Me
+                <button type="submit" className="btn-primary" disabled={loading}>
+                  {loading ? 'Adding...' : 'Notify Me'}
                 </button>
               </div>
               <p className="modal-footer-text">Join the waitlist.</p>
