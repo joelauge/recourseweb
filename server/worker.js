@@ -21,8 +21,16 @@ export default {
 
     if (url.pathname === '/api/create-checkout-session') {
       try {
-        const stripe = new Stripe(env.STRIPE_SECRET_KEY);
-        const { storageGB, monthlyPriceCents } = await request.json();
+        if (!env.STRIPE_SECRET_KEY) {
+          throw new Error('STRIPE_SECRET_KEY is not defined in the Worker environment.');
+        }
+
+        const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
+          httpClient: Stripe.createFetchHttpClient(),
+        });
+        
+        const body = await request.json();
+        const { storageGB, monthlyPriceCents } = body;
 
         const session = await stripe.checkout.sessions.create({
           ui_mode: 'embedded_page',
@@ -54,6 +62,7 @@ export default {
           },
         });
       } catch (error) {
+        console.error('Stripe Error:', error);
         return new Response(JSON.stringify({ error: error.message }), {
           status: 500,
           headers: {
