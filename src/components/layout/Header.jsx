@@ -24,9 +24,16 @@ export default function Header({ rootNode }) {
   });
 
   useEffect(() => {
-    const onScroll = () => setIsScrolled(window.scrollY > 40);
+    const onScroll = (e) => {
+      const top = e.detail?.scrollTop ?? window.scrollY;
+      setIsScrolled(top > 40);
+    };
+    window.addEventListener('kd-site-scroll', onScroll, { passive: true });
     window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
+    return () => {
+      window.removeEventListener('kd-site-scroll', onScroll);
+      window.removeEventListener('scroll', onScroll);
+    };
   }, []);
 
   const toggleTheme = () => {

@@ -93,10 +93,23 @@ export default function MainContent({ rootNode }) {
     window.addEventListener('kd-theme-change', handleTheme);
     window.addEventListener('kd-scroll-to', handleScroll);
     window.addEventListener('kd-open-waitlist', handleWaitlist);
+
+    // Forward scroll events from the host to the global window for the header
+    const host = rootNode?.host;
+    const onHostScroll = () => {
+      if (host) {
+        window.dispatchEvent(new CustomEvent('kd-site-scroll', { 
+          detail: { scrollTop: host.scrollTop } 
+        }));
+      }
+    };
+    if (host) host.addEventListener('scroll', onHostScroll, { passive: true });
+
     return () => {
       window.removeEventListener('kd-theme-change', handleTheme);
       window.removeEventListener('kd-scroll-to', handleScroll);
       window.removeEventListener('kd-open-waitlist', handleWaitlist);
+      if (host) host.removeEventListener('scroll', onHostScroll);
     };
   }, [rootNode]);
 
