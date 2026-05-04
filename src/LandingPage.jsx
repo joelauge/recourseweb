@@ -250,7 +250,7 @@ const USE_CASES = [
 ]
 
 /* ─── Main component ────────────────────────────────────────── */
-export default function LandingPage({ onGetStarted }) {
+export default function LandingPage({ onGetStarted, rootNode }) {
   const [sliderVal, setSliderVal] = useState(0)
   const [isAnnual, setIsAnnual] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
@@ -293,8 +293,9 @@ export default function LandingPage({ onGetStarted }) {
   }, [])
 
   const scrollTo = useCallback((id) => {
-    document.querySelector(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }, [])
+    const node = rootNode || document;
+    node.querySelector(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [rootNode])
 
   function handleManualGBChange(e) {
     const val = parseFloat(e.target.value) || 0

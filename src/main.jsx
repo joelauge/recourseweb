@@ -12,10 +12,10 @@ if (!PUBLISHABLE_KEY) {
   console.warn("Missing Clerk Publishable Key. Please add VITE_CLERK_PUBLISHABLE_KEY to your .env.local")
 }
 
-function Root({ initialData }) {
+function Root({ initialData, rootNode }) {
   const [showApp, setShowApp] = useState(false)
-  if (showApp) return <App data={initialData} />
-  return <LandingPage onGetStarted={() => setShowApp(true)} data={initialData} />
+  if (showApp) return <App data={initialData} rootNode={rootNode} />
+  return <LandingPage onGetStarted={() => setShowApp(true)} data={initialData} rootNode={rootNode} />
 }
 
 class KnowDriveSite extends HTMLElement {
@@ -36,7 +36,17 @@ class KnowDriveSite extends HTMLElement {
 
     // Inject styles into shadow DOM
     const styleSheet = new CSSStyleSheet();
-    styleSheet.replaceSync(styles);
+    styleSheet.replaceSync(`
+      :host {
+        display: block;
+        width: 100%;
+        height: 100vh;
+        overflow-y: auto;
+        overflow-x: hidden;
+        position: relative;
+      }
+      ${styles}
+    `);
     this.shadowRoot.adoptedStyleSheets = [styleSheet];
 
     // Create a container for React
@@ -49,7 +59,7 @@ class KnowDriveSite extends HTMLElement {
     this.root.render(
       <React.StrictMode>
         <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
-          <Root initialData={initialData} />
+          <Root initialData={initialData} rootNode={this.shadowRoot} />
         </ClerkProvider>
       </React.StrictMode>
     );
