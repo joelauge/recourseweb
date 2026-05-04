@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { handleCheckout } from '../stripe.js'
-import CheckoutModal from '../components/CheckoutModal'
-import WaitlistModal from '../components/WaitlistModal/WaitlistModal'
+import { handleCheckout } from '../../stripe.js'
+import CheckoutModal from '../CheckoutModal'
+import WaitlistModal from '../WaitlistModal/WaitlistModal'
 import knowdriveLogoSrc from '../../../assets/knowdrive_white_logo_notext.svg';
 import homeVideo from '../../../assets/knowdrive_home.mp4'
 import { 
@@ -104,7 +104,8 @@ export default function MainContent({ rootNode }) {
         }));
       }
     };
-    if (host) host.addEventListener('scroll', onHostScroll, { passive: true });
+    // Listen on capture to be sure we get it
+    if (host) host.addEventListener('scroll', onHostScroll, { passive: true, capture: true });
 
     return () => {
       window.removeEventListener('kd-theme-change', handleTheme);
