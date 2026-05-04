@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { handleCheckout } from '../stripe.js'
 import CheckoutModal from '../components/CheckoutModal'
 import WaitlistModal from '../components/WaitlistModal/WaitlistModal'
-import homeVideo from '../../assets/knowdrive_home.mp4'
+import knowdriveLogoSrc from '../../../assets/knowdrive_white_logo_notext.svg';
+import homeVideo from '../../../assets/knowdrive_home.mp4'
 import { 
   gbFromSlider, 
   sliderFromGB, 

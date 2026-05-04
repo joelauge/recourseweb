@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import knowdriveLogoSrc from '../../assets/knowdrive_white_logo_notext.svg';
+import knowdriveLogoSrc from '../../../assets/knowdrive_white_logo_notext.svg';
 
 function SunIcon() {
   return (

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import knowdriveLogoSrc from '../../assets/knowdrive_white_logo_notext.svg';
+import knowdriveLogoSrc from '../../../assets/knowdrive_white_logo_notext.svg';
 
 export default function Footer() {
   const [isDark, setIsDark] = useState(() => {
