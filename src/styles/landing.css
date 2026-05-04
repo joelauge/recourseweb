@@ -29,7 +29,7 @@
   --orb-opacity:    0.10;
   --bg-overlay:     transparent;
   --grid-line:      rgba(15, 23, 42, 0.04);
-  --nav-bg:         rgba(248, 250, 255, 0.92);
+  --nav-bg:         rgba(248, 250, 255, 0.72);
   --nav-border:     rgba(15, 23, 42, 0.08);
   --slider-unfilled: rgba(15, 23, 42, 0.10);
   --badge-bg:     rgba(99, 102, 241, 0.08);
@@ -64,7 +64,7 @@
   --orb-opacity:    0.28;
   --bg-overlay:     rgba(4, 8, 15, 0.72);
   --grid-line:      rgba(255, 255, 255, 0.025);
-  --nav-bg:         rgba(4, 8, 15, 0.85);
+  --nav-bg:         rgba(4, 8, 15, 0.72);
   --nav-border:     rgba(255, 255, 255, 0.08);
   --slider-unfilled: rgba(255, 255, 255, 0.10);
   --badge-bg:     rgba(99, 102, 241, 0.10);
@@ -160,7 +160,8 @@ img, svg { display: block; }
 }
 .l-nav.scrolled {
   background: var(--nav-bg);
-  backdrop-filter: blur(16px);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
   border-bottom: 1px solid var(--nav-border);
 }
 .l-nav-inner { display: flex; align-items: center; gap: 40px; }
