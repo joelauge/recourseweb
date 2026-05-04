@@ -3,6 +3,7 @@ import { handleCheckout } from '../../stripe.js'
 import CheckoutModal from '../CheckoutModal'
 import WaitlistModal from '../WaitlistModal/WaitlistModal'
 import knowdriveLogoSrc from '../../../assets/knowdrive_white_logo_notext.svg';
+import openClawIconSrc from '../../../assets/openclaw_clawonly.svg';
 import homeVideo from '../../../assets/knowdrive_home.mp4'
 import { 
   gbFromSlider, 
@@ -19,6 +20,19 @@ function BrainIcon() { return <svg width="22" height="22" viewBox="0 0 24 24" fi
 function ZapIcon() { return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg> }
 function ChartIcon() { return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18" /><path d="m19 9-5 5-4-4-3 3" /></svg> }
 function BotIcon() { return <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 8V4H8" /><rect width="16" height="12" x="4" y="8" rx="2" /><path d="M2 14h2" /><path d="M20 14h2" /><path d="M15 13v2" /><path d="M9 13v2" /></svg> }
+function ClawIcon() { 
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 12c0 4.4 3.6 8 8 8s8-3.6 8-8" />
+      <path d="M12 4v4" />
+      <path d="M16.2 5.8l-2.8 2.8" />
+      <path d="M7.8 5.8l2.8 2.8" />
+      <path d="M12 12m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+      <path d="M12 12l-4 4" />
+      <path d="M12 12l4 4" />
+    </svg>
+  );
+}
 function ScaleIcon() { return <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z" /><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z" /><path d="M7 21h10" /><path d="M12 3v18" /><path d="M3 7h18" /></svg> }
 function DnaIcon() { return <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m8 18 8-12" /><path d="m8 6 8 12" /><path d="M11 11h2" /><path d="M9 16h6" /><path d="M13 6h3" /><path d="M11 18H8" /><path d="M15 8h2" /><path d="M10 6H8" /></svg> }
 function BuildingIcon() { return <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="16" height="20" x="4" y="2" rx="2" ry="2" /><path d="M9 22v-4h6v4" /><path d="M8 6h.01" /><path d="M16 6h.01" /><path d="M8 10h.01" /><path d="M16 10h.01" /><path d="M8 14h.01" /><path d="M16 14h.01" /></svg> }
@@ -62,7 +76,7 @@ const FEATURES = [
 ]
 
 const USE_CASES = [
-  { icon: <BotIcon />, title: 'AI Assistants', desc: 'Give chatbots months of conversation history and deep institutional knowledge.' },
+  { icon: <img src={openClawIconSrc} alt="OpenClaw" style={{ width: 24, height: 24 }} />, title: 'OpenClaw Integration', desc: 'Give OpenClaw, and any claw variant an unlimited amount of memory.' },
   { icon: <ScaleIcon />, title: 'Legal Discovery', desc: 'Index entire case archives. Ask any question across millions of documents.' },
   { icon: <DnaIcon />, title: 'Medical Research', desc: 'Cross-reference clinical trials, patient records, and literature at scale.' },
   { icon: <BuildingIcon />, title: 'Enterprise Search', desc: 'Unify knowledge across all your tools, docs, and internal databases.' },
