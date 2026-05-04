@@ -13,6 +13,7 @@
     "worker:deploy": "wrangler deploy"
   },
   "dependencies": {
+    "@clerk/clerk-react": "^5.61.6",
     "@stripe/react-stripe-js": "^6.3.0",
     "@stripe/stripe-js": "^9.4.0",
     "cors": "^2.8.6",

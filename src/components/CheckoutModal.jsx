@@ -13,7 +13,7 @@ export default function CheckoutModal({ isOpen, onClose, clientSecret }) {
   if (!isOpen || !clientSecret) return null;
 
   return (
-    <div className="checkout-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={onClose}>
       <div className="checkout-container" onClick={e => e.stopPropagation()}>
         <button className="checkout-close" onClick={onClose}>
           <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2" fill="none">

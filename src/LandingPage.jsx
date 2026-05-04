@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import './styles/landing.css'
 import { handleCheckout } from './stripe.js'
 import CheckoutModal from './components/CheckoutModal'
+import WaitlistModal from './components/WaitlistModal/WaitlistModal'
 import knowdriveLogoSrc from '../assets/knowdrive_white_logo_notext.svg'
 import homeVideo from '../assets/knowdrive_home.mp4'
 
@@ -257,6 +258,7 @@ export default function LandingPage({ onGetStarted }) {
   const [stripeWarning, setStripeWarning] = useState(false)
   const [checkoutClientSecret, setCheckoutClientSecret] = useState(null)
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
+  const [isWaitlistOpen, setIsWaitlistOpen] = useState(false)
   const [isDark, setIsDark] = useState(() => {
     try { return localStorage.getItem('kd-theme') === 'dark' }
     catch { return false }
@@ -351,8 +353,8 @@ export default function LandingPage({ onGetStarted }) {
               >
                 {isDark ? <SunIcon /> : <MoonIcon />}
               </button>
-              <button className="btn-ghost" onClick={onGetStarted}>Sign In</button>
-              <button className="btn-primary" onClick={() => scrollTo('#pricing')}>Get Started</button>
+              <button className="btn-ghost" onClick={() => setIsWaitlistOpen(true)}>Sign In</button>
+              <button className="btn-primary" onClick={() => setIsWaitlistOpen(true)}>Get Started</button>
             </div>
           </div>
         </div>
@@ -376,10 +378,10 @@ export default function LandingPage({ onGetStarted }) {
                 storage. Feed your models unlimited knowledge. — pay only for what you use.
               </p>
               <div className="l-hero-ctas animate-in delay-3">
-                <button className="btn-primary large" onClick={() => scrollTo('#pricing')}>
+                <button className="btn-primary large" onClick={() => setIsWaitlistOpen(true)}>
                   Start for $5 / month
                 </button>
-                <button className="btn-ghost large" onClick={onGetStarted}>
+                <button className="btn-ghost large" onClick={() => setIsWaitlistOpen(true)}>
                   Open App →
                 </button>
               </div>
@@ -650,10 +652,10 @@ export default function LandingPage({ onGetStarted }) {
               No migrations. No re-indexing. No surprises.
             </p>
             <div className="l-cta-btns">
-              <button className="btn-primary large" onClick={() => scrollTo('#pricing')}>
+              <button className="btn-primary large" onClick={() => setIsWaitlistOpen(true)}>
                 Get Started — $5 / mo
               </button>
-              <button className="btn-ghost large" onClick={onGetStarted}>
+              <button className="btn-ghost large" onClick={() => setIsWaitlistOpen(true)}>
                 Open App →
               </button>
             </div>
@@ -684,6 +686,11 @@ export default function LandingPage({ onGetStarted }) {
         isOpen={isCheckoutOpen} 
         onClose={() => setIsCheckoutOpen(false)} 
         clientSecret={checkoutClientSecret} 
+      />
+
+      <WaitlistModal 
+        isOpen={isWaitlistOpen} 
+        onClose={() => setIsWaitlistOpen(false)} 
       />
     </div>
   )
