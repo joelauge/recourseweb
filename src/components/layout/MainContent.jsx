@@ -12,7 +12,7 @@ import {
   formatStorage, 
   formatUSD, 
   formatTokens 
-} from '../utils/pricing.js'
+} from '../../utils/pricing.js'
 
 /* ─── Icons ─────────────────────────────────────────────────── */
 function BrainIcon() { return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .52 5.886 3 3 0 1 0 5.174 2.688 3 3 0 1 0 5.658 0 3 3 0 1 0 5.174-2.688 4 4 0 0 0 .52-5.886 4 4 0 0 0-2.526-5.77A3 3 0 1 0 12 5z" /><path d="M9 13a4.5 4.5 0 0 0 3 3 4.5 4.5 0 0 0 3-3" /><path d="M12 8.5V16" /></svg> }
@@ -127,7 +127,7 @@ export default function MainContent({ rootNode }) {
   }, [sliderVal])
 
   return (
-    <div className={`landing${isDark ? ' dark' : ''}`}>
+    <div className={`landing landing-site${isDark ? ' dark' : ''}`}>
       <div className="landing-bg" aria-hidden>
         <div className="aurora-orb aurora-orb-1" /><div className="aurora-orb aurora-orb-2" />
         <div className="aurora-orb aurora-orb-3" /><div className="aurora-orb aurora-orb-4" />

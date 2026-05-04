@@ -17,7 +17,7 @@ export default function Footer() {
   };
 
   return (
-    <footer className={`landing${isDark ? ' dark' : ''}`}>
+    <footer className={`landing landing-footer${isDark ? ' dark' : ''}`}>
       <div className="l-footer">
         <div className="l-container">
           <div className="l-footer-inner">
@@ -30,7 +30,11 @@ export default function Footer() {
               <li><a href="#pricing" onClick={e => { e.preventDefault(); scrollTo('#pricing') }}>Pricing</a></li>
               <li><a href="mailto:hello@knowdrive.ai">Contact</a></li>
             </ul>
-            <div className="l-footer-copy">© 2026 KnowDrive.ai. All rights reserved.</div>
+            <div className="l-footer-copy">
+              © 2026 KnowDrive.ai is a product of <strong>Recourse Software Inc.</strong> 
+              <span className="l-footer-divider">|</span>
+              Made with <span className="l-footer-heart">❤️</span> in Canada
+            </div>
           </div>
         </div>
       </div>

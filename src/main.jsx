@@ -1,5 +1,6 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useSyncExternalStore } from 'react'
 import ReactDOM from 'react-dom/client'
+import { createPortal } from 'react-dom'
 import { ClerkProvider } from '@clerk/clerk-react'
 import styles from './styles/landing.css?inline'
 
@@ -7,65 +8,66 @@ import Header from './components/layout/Header'
 import MainContent from './components/layout/MainContent'
 import Footer from './components/layout/Footer'
 
-// Import your publishable key
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
 
-if (!PUBLISHABLE_KEY) {
-  console.warn("Missing Clerk Publishable Key. Please add VITE_CLERK_PUBLISHABLE_KEY to your .env.local")
+// ─── Global Registry for Modular Portals ─────────────────────
+const registry = {
+  state: { header: null, site: null, footer: null },
+  listeners: new Set(),
+  subscribe(listener) {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  },
+  register(type, node) {
+    this.state = { ...this.state, [type]: node };
+    this.listeners.forEach(l => l());
+  },
+  getSnapshot() {
+    return this.state;
+  }
+};
+
+function ModularHost() {
+  const roots = useSyncExternalStore(registry.subscribe.bind(registry), registry.getSnapshot.bind(registry));
+  
+  return (
+    <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
+      {roots.header && createPortal(<Header rootNode={roots.header} />, roots.header)}
+      {roots.site && createPortal(<MainContent rootNode={roots.site} />, roots.site)}
+      {roots.footer && createPortal(<Footer rootNode={roots.footer} />, roots.footer)}
+    </ClerkProvider>
+  );
 }
 
-function createCustomElement(tagName, Component) {
-  class CustomElement extends HTMLElement {
+// ─── Custom Element Definitions ──────────────────────────────
+function defineModularElement(tagName, type) {
+  class ModularElement extends HTMLElement {
     constructor() {
       super();
       this.attachShadow({ mode: 'open' });
-    }
-
-    connectedCallback() {
-      const initialData = {};
-      for (const attr of this.attributes) {
-        if (attr.name.startsWith('data-')) {
-          const key = attr.name.slice(5).replace(/-([a-z])/g, g => g[1].toUpperCase());
-          initialData[key] = attr.value;
-        }
-      }
-
+      
       const styleSheet = new CSSStyleSheet();
       styleSheet.replaceSync(`
-        :host {
-          display: block;
-          width: 100%;
-          position: relative;
-        }
+        :host { display: block; width: 100%; position: relative; }
         ${styles}
       `);
       this.shadowRoot.adoptedStyleSheets = [styleSheet];
-
-      const mountPoint = document.createElement('div');
-      mountPoint.id = 'kd-inner-root';
-      this.shadowRoot.appendChild(mountPoint);
-
-      this.root = ReactDOM.createRoot(mountPoint);
-      this.root.render(
-        <React.StrictMode>
-          <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
-            <Component initialData={initialData} rootNode={this.shadowRoot} />
-          </ClerkProvider>
-        </React.StrictMode>
-      );
     }
-
-    disconnectedCallback() {
-      if (this.root) this.root.unmount();
+    connectedCallback() {
+      registry.register(type, this.shadowRoot);
     }
   }
-
   if (!customElements.get(tagName)) {
-    customElements.define(tagName, CustomElement);
+    customElements.define(tagName, ModularElement);
   }
 }
 
-// Define the modular custom elements
-createCustomElement('knowdrive-header', Header);
-createCustomElement('knowdrive-site', MainContent);
-createCustomElement('knowdrive-footer', Footer);
+defineModularElement('knowdrive-header', 'header');
+defineModularElement('knowdrive-site', 'site');
+defineModularElement('knowdrive-footer', 'footer');
+
+// ─── Launch the Host Engine ──────────────────────────────────
+const hostContainer = document.createElement('div');
+hostContainer.style.display = 'none';
+document.body.appendChild(hostContainer);
+ReactDOM.createRoot(hostContainer).render(<ModularHost />);

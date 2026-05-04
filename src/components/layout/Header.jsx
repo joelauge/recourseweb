@@ -26,15 +26,22 @@ export default function Header({ rootNode }) {
   useEffect(() => {
     const onScroll = (e) => {
       const top = e.detail?.scrollTop ?? window.scrollY;
-      setIsScrolled(top > 40);
+      const progress = Math.min(top / 100, 1);
+      
+      // Update CSS variables for smooth interpolation
+      const host = rootNode?.host || document.documentElement;
+      host.style.setProperty('--nav-opacity', progress.toString());
+      
+      setIsScrolled(top > 10);
     };
+
     window.addEventListener('kd-site-scroll', onScroll, { passive: true });
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => {
       window.removeEventListener('kd-site-scroll', onScroll);
       window.removeEventListener('scroll', onScroll);
     };
-  }, []);
+  }, [rootNode]);
 
   const toggleTheme = () => {
     const newDark = !isDark;
@@ -44,7 +51,6 @@ export default function Header({ rootNode }) {
   };
 
   const scrollTo = (id) => {
-    // We send a global event for scrolling so the main site component can handle it
     window.dispatchEvent(new CustomEvent('kd-scroll-to', { detail: { id } }));
   };
 
