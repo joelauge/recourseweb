@@ -552,15 +552,11 @@ export default function LandingPage({ onGetStarted }) {
             {/* CTA */}
             <div className="pricing-cta">
               <button
-                className={`subscribe-btn${subscribeState === 'loading' ? ' loading' : ''}`}
-                onClick={handleSubscribe}
-                disabled={subscribeState === 'loading'}
+                className="subscribe-btn"
+                onClick={() => setIsWaitlistOpen(true)}
               >
                 <span>
-                  {subscribeState === 'loading'
-                    ? 'Redirecting to Stripe…'
-                    : `Subscribe — ${formatUSD(isAnnual ? annual : monthly)} / ${isAnnual ? 'year' : 'month'}`
-                  }
+                  Subscribe — {formatUSD(isAnnual ? annual : monthly)} / {isAnnual ? 'year' : 'month'}
                 </span>
               </button>
 
