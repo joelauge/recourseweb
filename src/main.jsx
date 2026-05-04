@@ -1,3 +1,7 @@
+import React, { useState } from 'react'
+import ReactDOM from 'react-dom/client'
+import App from './App.jsx'
+import LandingPage from './LandingPage.jsx'
 import { ClerkProvider } from '@clerk/clerk-react'
 
 // Import your publishable key
