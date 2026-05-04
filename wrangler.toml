@@ -3,7 +3,7 @@ main = "server/worker.js"
 compatibility_date = "2024-04-01"
 
 [vars]
-FRONTEND_URL = "http://localhost:5173" # Update this to your GitHub Pages URL for production
+FRONTEND_URL = "https://knowdrive.ai"
 
 # Note: STRIPE_SECRET_KEY should be added via wrangler secrets:
 # wrangler secret put STRIPE_SECRET_KEY
