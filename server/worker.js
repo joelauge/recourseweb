@@ -21,7 +21,13 @@ export default {
 
     if (url.pathname === '/api/waitlist') {
       try {
-        const { email } = await request.json();
+        const body = await request.json();
+        const email = body.email;
+        
+        if (!email) {
+          throw new Error('Email is required.');
+        }
+
         const RESEND_API_KEY = env.RESEND_API_KEY;
         const AUDIENCE_ID = '54d536d9-8a43-41f5-8894-2c349c6f4762';
 
@@ -29,16 +35,18 @@ export default {
           throw new Error('RESEND_API_KEY is not defined.');
         }
 
+        console.log('Waitlist request for:', email);
         const resendResponse = await fetch(`https://api.resend.com/audiences/${AUDIENCE_ID}/contacts`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${RESEND_API_KEY}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ email }),
+          body: JSON.stringify({ email, unsubscribed: false }),
         });
 
         const data = await resendResponse.json();
+        console.log('Resend response:', resendResponse.status, data);
 
         if (!resendResponse.ok) {
           throw new Error(data.message || 'Failed to add to waitlist');

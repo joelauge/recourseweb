@@ -11,11 +11,15 @@ export default function WaitlistModal({ isOpen, onClose }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    console.log('Submitting waitlist for:', email);
     setError('');
     setLoading(true);
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/waitlist`, {
+      const url = `${import.meta.env.VITE_API_BASE_URL || ''}/api/waitlist`;
+      console.log('Fetching URL:', url);
+      
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
@@ -60,34 +64,44 @@ export default function WaitlistModal({ isOpen, onClose }) {
 
           {error && <p className="modal-error">{error}</p>}
 
-          {!submitted ? (
-            <form className="waitlist-form" onSubmit={handleSubmit}>
-              <div className="input-group">
-                <input
-                  type="email"
-                  placeholder="Enter your email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  disabled={loading}
-                  required
-                />
-                <button type="submit" className="btn-primary" disabled={loading}>
-                  {loading ? 'Adding...' : 'Notify Me'}
-                </button>
+          <div className="modal-transition-container">
+            {!submitted ? (
+              <div className="waitlist-form">
+                <div className="input-group">
+                  <input
+                    type="email"
+                    placeholder="Enter your email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={loading}
+                    required
+                  />
+                  <button 
+                    type="button" 
+                    className="btn-primary" 
+                    disabled={loading}
+                    onClick={() => {
+                      console.log('Button clicked!');
+                      handleSubmit({ preventDefault: () => {} });
+                    }}
+                  >
+                    {loading ? 'Adding...' : 'Notify Me'}
+                  </button>
+                </div>
+                <p className="modal-footer-text">Join the waitlist.</p>
               </div>
-              <p className="modal-footer-text">Join the waitlist.</p>
-            </form>
-          ) : (
-            <div className="success-message">
-              <div className="success-icon">
-                <svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" strokeWidth="3" fill="none">
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
+            ) : (
+              <div className="success-message">
+                <div className="success-icon">
+                  <svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" strokeWidth="3" fill="none">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </div>
+                <h3>You're on the list!</h3>
+                <p>We'll email you as soon as a spot becomes available.</p>
               </div>
-              <h3>You're on the list!</h3>
-              <p>We'll email you as soon as a spot becomes available.</p>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </div>
