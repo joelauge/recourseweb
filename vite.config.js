@@ -1,4 +1,4 @@
-// Trigger deployment with updated secrets
+// Final build with correct Stripe PK mapping
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
