@@ -156,7 +156,7 @@ export default function MainContent({ rootNode }) {
               <h1 className="l-hero-title animate-in delay-1">The world's first<br /><span className="gradient-text">unlimited context window.</span></h1>
               <p className="l-hero-sub animate-in delay-2">KnowDrive.ai scales the current LLM context window of 1 million tokens (~5 megabytes) by several orders of magnitude, to a full petabyte of persistent AI context storage. Feed your models unlimited knowledge. — pay only for what you use.</p>
               <div className="l-hero-ctas animate-in delay-3">
-                <button className="btn-primary large" onClick={() => setIsWaitlistOpen(true)}>Start for $5 / month</button>
+                <button className="btn-primary large" onClick={() => setIsWaitlistOpen(true)}>Start for $15 / month</button>
                 <button className="btn-ghost large" onClick={() => setIsWaitlistOpen(true)}>Open App →</button>
               </div>
             </div>
@@ -288,9 +288,9 @@ export default function MainContent({ rootNode }) {
         <div className="l-container">
           <div className="l-cta-inner">
             <h2 className="l-cta-title">Start building with<br /><span className="gradient-text">infinite context</span></h2>
-            <p className="l-cta-sub">Your first gigabyte is $5. Scale to a petabyte with a single API call. No migrations. No re-indexing. No surprises.</p>
+            <p className="l-cta-sub">Your first gigabyte is $15. Scale to a petabyte with a single API call. No migrations. No re-indexing. No surprises.</p>
             <div className="l-cta-btns">
-              <button className="btn-primary large" onClick={() => setIsWaitlistOpen(true)}>Get Started — $5 / mo</button>
+              <button className="btn-primary large" onClick={() => setIsWaitlistOpen(true)}>Get Started — $15 / mo</button>
               <button className="btn-ghost large" onClick={() => setIsWaitlistOpen(true)}>Open App →</button>
             </div>
           </div>

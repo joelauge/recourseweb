@@ -5,9 +5,9 @@ export function gbFromSlider(v) {
 export function sliderFromGB(gb) {
   return (Math.log10(Math.max(gb, 1)) / 6) * 100
 }
-// Power-law volume discount: $5/GB at 1 GB, ~$0.50/GB at 1 PB
+// Power-law volume discount: $15/GB at 1 GB, ~$1.50/GB at 1 PB
 export function pricePerGB(gb) {
-  return Math.max(0.50, 5 * Math.pow(Math.max(gb, 1), -0.25))
+  return Math.max(1.50, 15 * Math.pow(Math.max(gb, 1), -0.25))
 }
 export function monthlyTotal(gb) {
   return gb * pricePerGB(gb)

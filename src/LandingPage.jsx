@@ -380,7 +380,7 @@ export default function LandingPage({ onGetStarted, rootNode }) {
               </p>
               <div className="l-hero-ctas animate-in delay-3">
                 <button className="btn-primary large" onClick={() => setIsWaitlistOpen(true)}>
-                  Start for $5 / month
+                  Start for $15 / month
                 </button>
                 <button className="btn-ghost large" onClick={() => setIsWaitlistOpen(true)}>
                   Open App →
@@ -650,7 +650,7 @@ export default function LandingPage({ onGetStarted, rootNode }) {
             </p>
             <div className="l-cta-btns">
               <button className="btn-primary large" onClick={() => setIsWaitlistOpen(true)}>
-                Get Started — $5 / mo
+                Get Started — $15 / mo
               </button>
               <button className="btn-ghost large" onClick={() => setIsWaitlistOpen(true)}>
                 Open App →
