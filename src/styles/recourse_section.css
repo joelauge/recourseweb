@@ -1,0 +1,102 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap');
+
+.recourse-section {
+  background-color: #000000;
+  color: #ffffff;
+  padding: 100px 20px;
+  position: relative;
+  overflow: hidden;
+  font-family: 'Inter', sans-serif;
+}
+
+.recourse-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(0, 100, 255, 0.15) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.recourse-container {
+  max-width: 1100px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 1;
+}
+
+.recourse-header {
+  text-align: center;
+  margin-bottom: 80px;
+}
+
+.recourse-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 3.5rem;
+  font-weight: 400;
+  margin-bottom: 20px;
+  line-height: 1.1;
+}
+
+.recourse-title .gold {
+  color: #D6A04B;
+  font-style: italic;
+}
+
+.recourse-subtitle {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 1.1rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.recourse-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 40px;
+}
+
+.recourse-card {
+  padding: 40px;
+  border-left: 1px solid rgba(214, 160, 75, 0.2);
+  transition: all 0.3s ease;
+}
+
+.recourse-card:hover {
+  border-left-color: #D6A04B;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.recourse-card-num {
+  font-family: 'Playfair Display', serif;
+  color: #D6A04B;
+  font-size: 1.5rem;
+  margin-bottom: 20px;
+  display: block;
+}
+
+.recourse-card-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.8rem;
+  margin-bottom: 15px;
+  font-weight: 400;
+}
+
+.recourse-card-desc {
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.6;
+  font-size: 1rem;
+}
+
+@media (max-width: 768px) {
+  .recourse-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .recourse-title {
+    font-size: 2.5rem;
+  }
+}

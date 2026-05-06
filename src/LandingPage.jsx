@@ -3,6 +3,7 @@ import './styles/landing.css'
 import { handleCheckout } from './stripe.js'
 import CheckoutModal from './components/CheckoutModal'
 import WaitlistModal from './components/WaitlistModal/WaitlistModal'
+import TechnicalArchitecture from './components/sections/TechnicalArchitecture'
 import knowdriveLogoSrc from '../assets/knowdrive_white_logo_notext.svg'
 import homeVideo from '../assets/knowdrive_home.mp4'
 
@@ -371,8 +372,8 @@ export default function LandingPage({ onGetStarted, rootNode }) {
                 Don't settle for 1 million tokens anymore.
               </div>
               <h1 className="l-hero-title animate-in delay-1">
-                The world's first<br />
-                <span className="gradient-text">unlimited context window.</span>
+                The world's only<br />
+                <span className="gradient-text">unlimited collaborative context window.</span>
               </h1>
               <p className="l-hero-sub animate-in delay-2">
                 KnowDrive.ai scales the current LLM context window of 1 million tokens (~5 megabytes) by several orders of magnitude, to a full petabyte of persistent AI context
@@ -405,12 +406,12 @@ export default function LandingPage({ onGetStarted, rootNode }) {
             {/* Video preview visual */}
             <div className="l-hero-visual animate-in delay-2">
               <div className="video-viewer">
-                <video 
-                  src={homeVideo} 
-                  autoPlay 
-                  loop 
-                  muted 
-                  playsInline 
+                <video
+                  src={homeVideo}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
                   className="hero-video"
                 />
                 <div className="video-overlay-glow" />
@@ -614,6 +615,8 @@ export default function LandingPage({ onGetStarted, rootNode }) {
         </div>
       </section>
 
+      <TechnicalArchitecture />
+
       {/* ── Use Cases ── */}
       <section className="l-usecases" id="usecases">
         <div className="l-container">
@@ -678,16 +681,16 @@ export default function LandingPage({ onGetStarted, rootNode }) {
           </div>
         </div>
       </footer>
-      
-      <CheckoutModal 
-        isOpen={isCheckoutOpen} 
-        onClose={() => setIsCheckoutOpen(false)} 
-        clientSecret={checkoutClientSecret} 
+
+      <CheckoutModal
+        isOpen={isCheckoutOpen}
+        onClose={() => setIsCheckoutOpen(false)}
+        clientSecret={checkoutClientSecret}
       />
 
-      <WaitlistModal 
-        isOpen={isWaitlistOpen} 
-        onClose={() => setIsWaitlistOpen(false)} 
+      <WaitlistModal
+        isOpen={isWaitlistOpen}
+        onClose={() => setIsWaitlistOpen(false)}
       />
     </div>
   )

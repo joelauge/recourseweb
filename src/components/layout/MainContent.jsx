@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { handleCheckout } from '../../stripe.js'
 import CheckoutModal from '../CheckoutModal'
 import WaitlistModal from '../WaitlistModal/WaitlistModal'
+import TechnicalArchitecture from '../sections/TechnicalArchitecture'
 import knowdriveLogoSrc from '../../../assets/knowdrive_white_logo_notext.svg';
 import openClawIconSrc from '../../../assets/openclaw_clawonly.svg';
 import homeVideo from '../../../assets/knowdrive_home.mp4'
@@ -153,8 +154,8 @@ export default function MainContent({ rootNode }) {
           <div className="l-hero-inner">
             <div className="l-hero-copy">
               <div className="l-hero-badge animate-in"><span className="badge-pulse" />Don't settle for 1 million tokens anymore.</div>
-              <h1 className="l-hero-title animate-in delay-1">The world's first<br /><span className="gradient-text">unlimited context window.</span></h1>
-              <p className="l-hero-sub animate-in delay-2">KnowDrive.ai scales the current LLM context window of 1 million tokens (~5 megabytes) by several orders of magnitude, to a full petabyte of persistent AI context storage. Feed your models unlimited knowledge. — pay only for what you use.</p>
+              <h1 className="l-hero-title animate-in delay-1">The world's only<br /><span className="gradient-text">unlimited collaborative context window.</span></h1>
+              <p className="l-hero-sub animate-in delay-2">Scale and share 1 GB to 1 PB of persistent context memory across your whole team. It's Dropbox for Inference. Feed your models unlimited knowledge—pay only for what you use.</p>
               <div className="l-hero-ctas animate-in delay-3">
                 <button className="btn-primary large" onClick={() => setIsWaitlistOpen(true)}>Start for $15 / month</button>
                 <button className="btn-ghost large" onClick={() => setIsWaitlistOpen(true)}>Open App →</button>
@@ -265,6 +266,8 @@ export default function MainContent({ rootNode }) {
         </div>
       </section>
 
+      <TechnicalArchitecture />
+
       <section className="l-usecases" id="usecases">
         <div className="l-container">
           <div className="section-header">
@@ -273,6 +276,7 @@ export default function MainContent({ rootNode }) {
             <p className="section-sub">From solo developers to global enterprises — anyone building AI that needs to remember.</p>
           </div>
           <div className="usecases-grid">
+            {/* ── USE CASES ── */}
             {USE_CASES.map(u => (
               <div key={u.title} className="usecase-card">
                 <div className="usecase-icon">{u.icon}</div>
