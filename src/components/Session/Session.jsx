@@ -1,21 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import FileCard from '../FileCard/FileCard';
 import { OP_MAP } from '../../constants';
-import { createMockStream } from '../../utils/mockData';
 import { UploadIcon, SearchIcon, ListIcon, DiffIcon, ExtractIcon, MapIcon, InfoIcon, DBIcon, FileIcon, WarnIcon, ChatIcon, CheckIcon, MoveIcon, SendIcon, ViewToggleIcon, ChevronIcon, TreeViewIcon, MicIcon, ImageIcon, VideoIcon } from '../Icons';
 import FileTree from '../FileTree/FileTree';
 import VectorSidebar from '../VectorSidebar/VectorSidebar';
+import FileViewer from '../FileViewer/FileViewer';
 
-const MOCK_VECTORS = [
-  { id: 'v1', tags: ['PIPEDA', 'AI Governance'], content: 'Privacy principles for AI systems: Transparency, Accountability, and Individual Access must be maintained throughout the model lifecycle.', source: 'pipeda-manual-v2.vec', score: 0.98 },
-  { id: 'v2', tags: ['SuperVector'], content: 'Index optimization: HNSW graphs allow for O(log n) search complexity while maintaining 95%+ recall on high-dimensional vectors.', source: 'bt-orchestration-v2.1.kb', score: 0.95 },
-  { id: 'v3', tags: ['PIPEDA'], content: 'Consent requirements: Meaningful consent is required for the collection, use, and disclosure of personal information.', source: 'pipeda-manual-v2.vec', score: 0.92 },
-  { id: 'v4', tags: ['AI Governance'], content: 'Bias mitigation: Regular auditing of training datasets is required to ensure fairness and prevent disparate impact.', source: 'compliance-audit-2024.pdf', score: 0.89 },
-  { id: 'v5', tags: ['Market Intel'], content: 'Competitor analysis: DeepMind remains the primary innovator in agentic frameworks, though open-source alternatives are gaining traction.', source: 'q1-market-analysis-2025.raw', score: 0.87 }
-];
-
-export default // ─── SESSION COMPONENT ────────────────────────────────────────────────────────
-function Session({ session, isActive, isOverLimit, sessionPct, onUpgradeClick, setFiles, availableSessions, moveFile, showSidebar, showTopPanel, showBottomPanel, isVectorSidebarOpen, setIsVectorSidebarOpen, searchMode, searchValue, setSearchValue, activeVectorStoreId }) {
+export default function Session({ session, isActive, isOverLimit, sessionPct, onUpgradeClick, setFiles, availableSessions, moveFile, showSidebar, showTopPanel, showBottomPanel, isVectorSidebarOpen, setIsVectorSidebarOpen, searchMode, searchValue, setSearchValue, activeVectorStoreId, performSearch, searchResults, uploadFile, deleteFile, fileStatuses }) {
   const files = session.files;
   const [scopedIds, setScopedIds] = useState(new Set());
   const [draggingId, setDraggingId] = useState(null);
@@ -29,13 +20,24 @@ function Session({ session, isActive, isOverLimit, sessionPct, onUpgradeClick, s
   const [activeOp, setActiveOp] = useState("QUERY");
   const [isFilesDrawerOpen, setIsFilesDrawerOpen] = useState(false);
   const [streamLog, setStreamLog] = useState([]);
-  const [submitting, setSubmitting] = useState(false);
   const [scopedTags, setScopedTags] = useState(new Set());
   const [isOpMenuOpen, setIsOpMenuOpen] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(420);
   const [isResizing, setIsResizing] = useState(false);
+  const [realAtoms, setRealAtoms] = useState([]);
+  const [isFetchingAtoms, setIsFetchingAtoms] = useState(false);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [isThinking, setIsThinking] = useState(false);
+  const [openFiles, setOpenFiles] = useState([]); // List of file objects
+  const [activeOpenFileId, setActiveOpenFileId] = useState(null);
 
-
+  const fileInputRef = useRef();
+  const opMenuRef = useRef();
+  const streamLogRef = useRef();
+  const chatEndRef = useRef();
+  const dragEnterCount = useRef(0);
+  const trayEnterCount = useRef(0);
+  const tagTrayEnterCount = useRef(0);
 
   useEffect(() => {
     if (scopedTags.size > 0) {
@@ -45,18 +47,50 @@ function Session({ session, isActive, isOverLimit, sessionPct, onUpgradeClick, s
     }
   }, [scopedTags.size]);
 
-  const filteredVectors = MOCK_VECTORS.filter(v => 
-    v.tags.some(t => scopedTags.has(t))
-  );
-  const fileInputRef = useRef();
-  const streamLogRef = useRef();
-  const opMenuRef = useRef();
-  const dragEnterCount = useRef(0);
-  // Stable ref so stream callbacks never close over a stale setFiles prop
+  const filteredVectors = searchResults && searchResults.length > 0
+    ? searchResults
+    : realAtoms;
+
+  // Fetch real atoms when scope changes
+  const scopedIdsStr = JSON.stringify(Array.from(scopedIds));
+  useEffect(() => {
+    if (scopedIds.size === 0) {
+      setRealAtoms([]);
+      return;
+    }
+
+    const ids = Array.from(scopedIds);
+    const lastId = ids[ids.length - 1];
+    const file = files.find(f => f.id === lastId);
+    if (!file || file.state !== "READY") return;
+
+    let isMounted = true;
+    const fetchAtoms = async () => {
+      setIsFetchingAtoms(true);
+      try {
+        const res = await fetch(`/search?query=${encodeURIComponent(file.path)}&mode=uri&limit=15`);
+        if (!res.ok) throw new Error("Failed to fetch atoms");
+        const data = await res.json();
+        if (isMounted) setRealAtoms(data.atoms || []);
+      } catch (err) {
+        console.error("Atom fetch error:", err);
+      } finally {
+        if (isMounted) setIsFetchingAtoms(false);
+      }
+    };
+
+    fetchAtoms();
+    return () => { isMounted = false; };
+  }, [scopedIdsStr, files]);
+
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatMessages, isThinking]);
+
   const setFilesRef = useRef(setFiles);
   useEffect(() => { setFilesRef.current = setFiles; }, [setFiles]);
-  // Defined forward-ref so startStream doesn't need to re-create on every render
-  const handleStreamEventRef = useRef(null);
 
   // Click outside op menu
   useEffect(() => {
@@ -114,75 +148,61 @@ function Session({ session, isActive, isOverLimit, sessionPct, onUpgradeClick, s
     }, 50);
   }, []);
 
-  const handleStreamEvent = useCallback(({ fileId, state, msg, pct }) => {
+  const handleStatusUpdate = useCallback((uri, data) => {
     setFilesRef.current(prev => prev.map(f => {
-      if (f.id !== fileId) return f;
-      
-      let newTags = [...f.tags];
-      let newStats = [...f.stats];
-      
-      if (state === "REMEMBERING") {
-        newTags = [["amber", "REMEMBERING"], ["gray", f.mb + " MB"]];
-        newStats = [{ v: "SYNC", k: "TASK" }, { v: "CLOUD", k: "MODE" }, { v: pct + "%", k: "STATUS" }];
-      } else if (state === "LEARNING") {
-        newTags = [["violet", "LEARNING"], ["gray", f.mb + " MB"]];
-        newStats = [{ v: Math.round(f.mb * 7.5), k: "EST.CHUNKS" }, { v: "BERT", k: "MODEL" }, { v: "TASK", k: "PENDING" }];
-      } else if (state === "INDEXING") {
-        newTags = [["blue", "INDEXING"], ["gray", f.mb + " MB"]];
-        newStats = [{ v: "HNSW", k: "DB" }, { v: "VEC", k: "STORE" }, { v: "BUSY", k: "IO" }];
-      } else if (state === "READY") {
-        const typeColor = { vec: "blue", kb: "teal", vid: "red", img: "violet", raw: "amber" }[f.type] || "gray";
-        const ext = f.path.split(".").pop().toUpperCase();
-        newTags = [[typeColor, ext], ["gray", f.mb + " MB"], ["green", "SUPERVECTOR"]];
-        newStats = [
-          { v: Math.round(f.mb * 8.2), k: "VECTORS" },
-          { v: "READY", k: "STATE" },
-          { v: "0.95", k: "DENSITY" },
-          { v: "LOCAL", k: "LOC" }
-        ];
+      if (f.path !== uri) return f;
+
+      const { status, chunks_processed, chunks_total } = data;
+      let state = "QUEUED";
+      let progress = 0;
+      let msg = "Processing...";
+
+      if (status === 'processed' || status === 'ready' || status === 'completed') {
+        state = "READY";
+        progress = 100;
+        msg = "Ingestion complete";
+      } else if (status === 'indexing') {
+        state = "INDEXING";
+        progress = 50;
+        msg = `Indexing chunks... (${chunks_processed || 0}/${chunks_total || '?'})`;
+      } else if (status === 'learning' || status === 'processing') {
+        state = "LEARNING";
+        progress = 30;
+        msg = status === 'learning' ? "Extracting embeddings..." : "Analyzing content...";
       }
 
-      return { 
-        ...f, 
-        state, 
-        progress: pct, 
+      const typeColor = { vec: "blue", kb: "teal", vid: "red", img: "violet", raw: "amber" }[f.type] || "gray";
+      const ext = f.path.split(".").pop().toUpperCase();
+
+      const newTags = state === "READY"
+        ? [[typeColor, ext], ["gray", (f.mb || 0) + " MB"], ["green", "SUPERVECTOR"]]
+        : [[state === "INDEXING" ? "blue" : "violet", state], ["gray", (f.mb || 0) + " MB"]];
+
+      const newStats = state === "READY"
+        ? [{ v: chunks_total || Math.round((f.mb || 1) * 8.2), k: "VECTORS" }, { v: "READY", k: "STATE" }, { v: "0.95", k: "DENSITY" }, { v: "LOCAL", k: "LOC" }]
+        : [{ v: chunks_processed || 0, k: "CHUNKS" }, { v: "BERT", k: "MODEL" }, { v: "TASK", k: state }];
+
+      return {
+        ...f,
+        state,
+        progress,
         logs: [...(f.logs || []).slice(-3), msg],
         tags: newTags,
         stats: newStats
       };
     }));
-    const evClass = `ev-${state.toLowerCase()}`;
-    addLogEntry(fileId, `[${state}] ${msg}`, evClass);
-  }, [addLogEntry]);
-
-  // Always keep the ref current
-  handleStreamEventRef.current = handleStreamEvent;
-
-  const startStream = useCallback((fileId, fileMb) => {
-    createMockStream(fileId, fileMb, (evt) => handleStreamEventRef.current(evt));
   }, []);
 
-  // Fire streams when the corpus changes (initial load or store switch)
-  // Track files[0]?.id as a stable proxy for 'new corpus loaded'
-  const firstFileId = files[0]?.id ?? null;
+  // Effect to sync file statuses from hook
   useEffect(() => {
-    if (!session.hasSeedFiles || files.length === 0) return;
-    setStreamLog([]);
-    const snapshot = [...files];
-    const timers = snapshot.map((f, i) =>
-      setTimeout(() => {
-        if (f.state !== 'READY') {
-          createMockStream(f.id, f.mb, (evt) => handleStreamEventRef.current?.(evt));
-        }
-      }, 300 + i * 400)
-    );
-    return () => timers.forEach(clearTimeout);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firstFileId]); // fires when corpus root changes
+    Object.entries(fileStatuses).forEach(([uri, data]) => {
+      handleStatusUpdate(uri, data);
+    });
+  }, [fileStatuses, handleStatusUpdate]);
+
 
   const scopedFiles = files.filter(f => scopedIds.has(f.id));
   const totalScopedMb = scopedFiles.reduce((s, f) => s + f.mb, 0);
-  const canSubmit = scopedIds.size > 0 && queryText.trim().length > 0;
 
   function addToScope(file) {
     if (file.state !== "READY") return;
@@ -193,29 +213,58 @@ function Session({ session, isActive, isOverLimit, sessionPct, onUpgradeClick, s
   }
 
   function handleFileClick(file) { addToScope(file); }
+  
+  function handleFileDoubleClick(file) {
+    if (!openFiles.find(f => f.id === file.id)) {
+      setOpenFiles(prev => [...prev, file]);
+    }
+    setActiveOpenFileId(file.id);
+  }
 
-  function handleDragStart(file) {
+  function closeFile(e, fileId) {
+    e.stopPropagation();
+    setOpenFiles(prev => {
+      const next = prev.filter(f => f.id !== fileId);
+      if (activeOpenFileId === fileId) {
+        setActiveOpenFileId(next.length > 0 ? next[next.length - 1].id : null);
+      }
+      return next;
+    });
+  }
+
+  function handleDragStart(e, file) {
     if (file.state !== "READY") return;
+    e.dataTransfer.setData("application/x-knowdrive-file", file.id);
+    e.dataTransfer.effectAllowed = "copyMove";
     setDraggingId(file.id);
     setFiles(prev => prev.map(f => f.id === file.id ? { ...f, dragging: true } : f));
   }
-  function handleDragEnd() {
+  function handleDragEnd(e) {
     setDraggingId(null);
     setFiles(prev => prev.map(f => ({ ...f, dragging: false })));
   }
 
   function handleTrayDrop(e) {
-    e.preventDefault(); setTrayDragOver(false);
+    e.preventDefault();
+    setTrayDragOver(false);
+
     const tag = e.dataTransfer.getData("application/x-knowdrive-tag");
     if (tag) {
       setScopedTags(prev => new Set([...prev, tag]));
+      addLogEntry("SYSTEM", `[SCOPE] Added tag #${tag} to active query context`, "ev-ready");
       return;
     }
-    if (draggingId) {
-      const f = files.find(f => f.id === draggingId);
-      if (f) addToScope(f);
+
+    const fileId = e.dataTransfer.getData("application/x-knowdrive-file") || draggingId;
+    if (fileId) {
+      const f = files.find(f => f.id === fileId);
+      if (f) {
+        addToScope(f);
+        addLogEntry(f.id, `[SCOPE] Added file to active query context`, "ev-ready");
+      }
       return;
     }
+
     if (e.dataTransfer.files.length) handleOSFileDrop(Array.from(e.dataTransfer.files));
   }
 
@@ -225,6 +274,7 @@ function Session({ session, isActive, isOverLimit, sessionPct, onUpgradeClick, s
     const tag = e.dataTransfer.getData("application/x-knowdrive-tag");
     if (tag) {
       setScopedTags(prev => new Set([...prev, tag]));
+      addLogEntry("SYSTEM", `[SCOPE] Added tag #${tag} to active query context`, "ev-ready");
     }
   }
 
@@ -235,33 +285,15 @@ function Session({ session, isActive, isOverLimit, sessionPct, onUpgradeClick, s
     handleOSFileDrop(Array.from(e.dataTransfer.files));
   }
 
-  function handleOSFileDrop(osFiles) {
-    const newCards = osFiles.map((f, i) => {
-      const ext = f.name.split(".").pop().toLowerCase();
-      const type = ["pdf","doc","docx","txt","md","vec"].includes(ext) ? "vec"
-        : ["json","yaml","yml","kb"].includes(ext) ? "kb"
-        : ["mp4","mov","webm"].includes(ext) ? "vid"
-        : ["png","jpg","jpeg","webp"].includes(ext) ? "img" : "raw";
-      const mb = Math.max(1, Math.round(f.size / 1024 / 1024));
-      const name = f.name.replace(/\.[^.]+$/, "");
-      const id = "u" + Date.now() + i;
-      return {
-        id, name, type, mb, isNew: true,
-        path: `session/${session.id}/uploads/${f.name}`,
-        addedAt: Date.now() + i,
-        tags: [[{vec:"blue",kb:"teal",vid:"red",img:"violet",raw:"amber"}[type], ext.toUpperCase() + " · uploaded"], ["gray", mb + " MB"]],
-        stats: [{ v:"—", k:"VECTORS" }, { v: ext.toUpperCase(), k:"FORMAT" }, { v:"now", k:"UPLOADED" }, { v:"pending", k:"INDEX" }],
-        state: "QUEUED", progress: 0, logs: [], animDelay: i * 80,
-      };
-    });
-    setFiles(prev => [...prev, ...newCards]);
-    newCards.forEach((f, i) => {
-      setTimeout(() => {
-        setFiles(prev => prev.map(fc => fc.id === f.id ? { ...fc, state: "REMEMBERING" } : fc));
-        startStream(f.id, f.mb);
-        addLogEntry(f.id, `[QUEUED] File received — starting ingestion pipeline`, "ev-remembering");
-      }, i * 1200 + 400); 
-    });
+  async function handleOSFileDrop(osFiles) {
+    for (const f of osFiles) {
+      try {
+        await uploadFile(f);
+        addLogEntry(f.name, `[UPLOAD] File sent to KnowDB pipeline`, "ev-remembering");
+      } catch (err) {
+        addLogEntry(f.name, `[ERROR] Upload failed: ${err.message}`, "ev-error");
+      }
+    }
   }
 
   const hasFiles = files.length > 0;
@@ -270,7 +302,7 @@ function Session({ session, isActive, isOverLimit, sessionPct, onUpgradeClick, s
   const filteredBySearch = files.filter(f => {
     if (!searchValue) return true;
     const matchName = f.name.toLowerCase().includes(searchValue.toLowerCase());
-    
+
     if (searchMode === "AUDIO") {
       return matchName && (f.type === "raw" || f.path.match(/\.(mp3|wav|ogg|m4a)$/i));
     }
@@ -295,195 +327,229 @@ function Session({ session, isActive, isOverLimit, sessionPct, onUpgradeClick, s
   if (!isActive) return null;
 
   return (
-    <div style={{ display:"flex", flex:1, flexDirection:"row", overflow:"hidden", position:"relative" }}>
-      <div className={`fs-overlay ${isFilesDrawerOpen ? "active" : ""}`} onClick={() => setIsFilesDrawerOpen(false)}/>
+    <div style={{ display: "flex", flex: 1, flexDirection: "row", overflow: "hidden", position: "relative", minHeight: 0 }}>
+      <div className={`fs-overlay ${isFilesDrawerOpen ? "active" : ""}`} onClick={() => setIsFilesDrawerOpen(false)} />
 
-      <div style={{ display:"flex", flex:1, overflow:"hidden" }}>
+      <div style={{ display: "flex", flex: 1, overflow: "hidden", minHeight: 0 }}>
 
-        <div 
+        <div
           className={`fs-panel ${isFilesDrawerOpen ? "m-open" : ""} ${!showSidebar ? "collapsed" : ""}`}
           style={{ width: sidebarWidth, minWidth: sidebarWidth }}
         >
           <div className="fs-resizer" onMouseDown={handleResizeStart} />
-        <div className="fs-toolbar">
-          <div className="fs-toolbar-top">
-            <div className="fs-title">Your Files</div>
-            <button className="upload-btn" onClick={() => fileInputRef.current?.click()}>
-              <UploadIcon /> Add files
-            </button>
-            <input ref={fileInputRef} type="file" multiple style={{ display:"none" }}
-              onChange={e => { handleOSFileDrop(Array.from(e.target.files)); e.target.value = ""; }}/>
-            <div style={{ flex: 1 }} />
-            <select className="sort-select" value={sortOrder} onChange={e => setSortOrder(e.target.value)}>
-              <option value="recent">Most Recent</option>
-              <option value="name_asc">Name (A-Z)</option>
-              <option value="name_desc">Name (Z-A)</option>
-              <option value="size_desc">Largest Size</option>
-              <option value="type">File Type</option>
-            </select>
-            <div style={{ display: 'flex', gap: '4px', marginLeft: '4px' }}>
-              <button className={`view-toggle-btn ${!isTreeView ? "active" : ""}`} onClick={() => setIsTreeView(false)} style={{ background: "transparent", border: "1px solid var(--border)", borderRadius: "4px", padding: "4px", cursor: "pointer", display: "flex", alignItems: "center", color: !isTreeView ? "var(--blue)" : "var(--text-muted)" }}>
-                <ViewToggleIcon active={!isTreeView} />
+          <div className="fs-toolbar">
+            <div className="fs-toolbar-top">
+              <div className="fs-title">Your Files</div>
+              <button className="upload-btn" onClick={() => fileInputRef.current?.click()}>
+                <UploadIcon /> Add files
               </button>
-              <button className={`view-toggle-btn ${isTreeView ? "active" : ""}`} onClick={() => setIsTreeView(true)} style={{ background: "transparent", border: "1px solid var(--border)", borderRadius: "4px", padding: "4px", cursor: "pointer", display: "flex", alignItems: "center", color: isTreeView ? "var(--blue)" : "var(--text-muted)" }}>
-                <TreeViewIcon active={isTreeView} />
-              </button>
-              {!isTreeView && (
-                <button className={`view-toggle-btn ${isExtendedView ? "active" : ""}`} onClick={() => setIsExtendedView(!isExtendedView)} style={{ background: "transparent", border: "1px solid var(--border)", borderRadius: "4px", padding: "4px", cursor: "pointer", display: "flex", alignItems: "center", color: isExtendedView ? "var(--blue)" : "var(--text-muted)" }}>
-                  <ListIcon size={14} />
+              <input ref={fileInputRef} type="file" multiple style={{ display: "none" }}
+                onChange={e => { handleOSFileDrop(Array.from(e.target.files)); e.target.value = ""; }} />
+              <div style={{ flex: 1 }} />
+              <select className="sort-select" value={sortOrder} onChange={e => setSortOrder(e.target.value)}>
+                <option value="recent">Most Recent</option>
+                <option value="name_asc">Name (A-Z)</option>
+                <option value="name_desc">Name (Z-A)</option>
+                <option value="size_desc">Largest Size</option>
+                <option value="type">File Type</option>
+              </select>
+              <div style={{ display: 'flex', gap: '4px', marginLeft: '4px' }}>
+                <button className={`view-toggle-btn ${!isTreeView ? "active" : ""}`} onClick={() => setIsTreeView(false)} style={{ background: "transparent", border: "1px solid var(--border)", borderRadius: "4px", padding: "4px", cursor: "pointer", display: "flex", alignItems: "center", color: !isTreeView ? "var(--blue)" : "var(--text-muted)" }}>
+                  <ViewToggleIcon active={!isTreeView} />
                 </button>
-              )}
+                <button className={`view-toggle-btn ${isTreeView ? "active" : ""}`} onClick={() => setIsTreeView(true)} style={{ background: "transparent", border: "1px solid var(--border)", borderRadius: "4px", padding: "4px", cursor: "pointer", display: "flex", alignItems: "center", color: isTreeView ? "var(--blue)" : "var(--text-muted)" }}>
+                  <TreeViewIcon active={isTreeView} />
+                </button>
+                {!isTreeView && (
+                  <button className={`view-toggle-btn ${isExtendedView ? "active" : ""}`} onClick={() => setIsExtendedView(!isExtendedView)} style={{ background: "transparent", border: "1px solid var(--border)", borderRadius: "4px", padding: "4px", cursor: "pointer", display: "flex", alignItems: "center", color: isExtendedView ? "var(--blue)" : "var(--text-muted)" }}>
+                    <ListIcon size={14} />
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
-          <div className="fs-path">
-            <span>knowdrive://</span>
-            <span style={{ color:"var(--text-muted)" }}> / </span>
-            <span>session</span>
-            <span style={{ color:"var(--text-muted)" }}> / </span>
-            <span className="crumb-active">{session.id}</span>
-          </div>
-        </div>
-
-        <div
-          className="file-list-wrap"
-          onDragEnter={e => { if (e.dataTransfer.types.includes("Files")) { e.preventDefault(); dragEnterCount.current++; setListDragOver(true); }}}
-          onDragLeave={() => { dragEnterCount.current--; if (dragEnterCount.current <= 0) { dragEnterCount.current = 0; setListDragOver(false); }}}
-          onDragOver={e => { if (e.dataTransfer.types.includes("Files")) e.preventDefault(); }}
-          onDrop={handleListOSDrop}
-        >
-          <div className={`fs-drop-overlay ${listDragOver ? "active" : ""}`} style={{ pointerEvents: 'none' }}>
-            <div className="fs-drop-msg">
-              <UploadIcon />
-              <span>Drop to ingest into KnowDB</span>
+            <div className="fs-path">
+              <span>knowdrive://</span>
+              <span style={{ color: "var(--text-muted)" }}> / </span>
+              <span>session</span>
+              <span style={{ color: "var(--text-muted)" }}> / </span>
+              <span className="crumb-active">{session.id}</span>
             </div>
           </div>
 
-          {!hasFiles ? (
-            <div className="empty-state">
-              <div className="empty-icon"><FileIcon /></div>
-              <div className="empty-title">Your Workspace is Empty</div>
-              <div className="empty-sub">No files in this session yet. Upload a file or drag one here to begin indexing.</div>
-              <button className="empty-cta" onClick={() => fileInputRef.current?.click()}>
-                <UploadIcon /> Add your first file
-              </button>
+          <div
+            className="file-list-wrap"
+            onDragEnter={e => { if (e.dataTransfer.types.includes("Files")) { e.preventDefault(); dragEnterCount.current++; setListDragOver(true); } }}
+            onDragLeave={() => { dragEnterCount.current--; if (dragEnterCount.current <= 0) { dragEnterCount.current = 0; setListDragOver(false); } }}
+            onDragOver={e => { if (e.dataTransfer.types.includes("Files")) e.preventDefault(); }}
+            onDrop={handleListOSDrop}
+          >
+            <div className={`fs-drop-overlay ${listDragOver ? "active" : ""}`} style={{ pointerEvents: 'none' }}>
+              <div className="fs-drop-msg">
+                <UploadIcon />
+                <span>Drop to ingest into KnowDB</span>
+              </div>
             </div>
-          ) : sortedFiles.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-icon" style={{ opacity: 0.5 }}><SearchIcon size={24} /></div>
-              <div className="empty-title">No results found</div>
-              <div className="empty-sub">No files in this session match your {searchMode.toLowerCase()} search for "{searchValue}".</div>
-              <button className="empty-cta" onClick={() => setSearchValue("")}>
-                Clear Search
-              </button>
-            </div>
-          ) : isTreeView ? (
-            <FileTree 
-              files={sortedFiles} 
-              onFileClick={handleFileClick} 
-              onDragStart={handleDragStart} 
-              onDragEnd={handleDragEnd} 
-              onRename={(id) => {
-                // Find file and set isRenaming in local state if we had it, but here we just trigger rename
-                // For now, let's keep it simple and just set a prompt or similar, 
-                // but better is to match FileCard's renaming logic.
-                const f = files.find(f => f.id === id);
-                if (f) {
-                  const newName = prompt("Rename file:", f.name);
-                  if (newName && newName !== f.name) {
-                    setFiles(prev => prev.map(f => f.id === id ? { ...f, name: newName } : f));
-                    addLogEntry(id, `[SYSTEM] Renamed file to: ${newName}`, "ev-ready");
-                  }
-                }
-              }}
-              onDelete={(id) => {
-                setFiles(prev => prev.filter(f => f.id !== id));
-                removeFromScope(id);
-              }}
-              onMove={(id, targetId) => {
-                removeFromScope(id);
-                moveFile(id, session.id, targetId);
-              }}
-              availableSessions={availableSessions}
-              onUpdateFile={(id, data) => setFiles(prev => prev.map(f => f.id === id ? { ...f, ...data } : f))}
-              onClickTag={(label) => setScopedTags(prev => { const s = new Set(prev); if (s.has(label)) s.delete(label); else s.add(label); return s; })}
-            />
-          ) : (
-            sortedFiles.map(file => (
-              <FileCard
-                key={file.id}
-                file={{ ...file, path: file.path.replace("{sid}", session.id) }}
-                isSelected={scopedIds.has(file.id)}
-                isOverLimit={isOverLimit}
-                isExtendedView={isExtendedView}
-                onUpgradeClick={onUpgradeClick}
+
+            {!hasFiles ? (
+              <div className="empty-state">
+                <div className="empty-icon"><FileIcon /></div>
+                <div className="empty-title">Your Workspace is Empty</div>
+                <div className="empty-sub">No files in this session yet. Upload a file or drag one here to begin indexing.</div>
+                <button className="empty-cta" onClick={() => fileInputRef.current?.click()}>
+                  <UploadIcon /> Add your first file
+                </button>
+              </div>
+            ) : sortedFiles.length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-icon" style={{ opacity: 0.5 }}><SearchIcon size={24} /></div>
+                <div className="empty-title">No results found</div>
+                <div className="empty-sub">No files in this session match your {searchMode.toLowerCase()} search for "{searchValue}".</div>
+                <button className="empty-cta" onClick={() => setSearchValue("")}>
+                  Clear Search
+                </button>
+              </div>
+            ) : isTreeView ? (
+              <FileTree
+                files={sortedFiles}
+                onFileClick={handleFileClick}
+                onFileDoubleClick={handleFileDoubleClick}
                 onDragStart={handleDragStart}
                 onDragEnd={handleDragEnd}
-                onClick={handleFileClick}
-                availableSessions={availableSessions}
-                onRename={(id, newName) => {
-                  setFiles(prev => prev.map(f => f.id === id ? { ...f, name: newName } : f));
-                  addLogEntry(id, `[SYSTEM] Renamed file to: ${newName}`, "ev-ready");
+                onRename={(id) => {
+                  const f = files.find(f => f.id === id);
+                  if (f) {
+                    const newName = prompt("Rename file:", f.name);
+                    if (newName && newName !== f.name) {
+                      setFiles(prev => prev.map(f => f.id === id ? { ...f, name: newName } : f));
+                      addLogEntry(id, `[SYSTEM] Renamed file to: ${newName}`, "ev-ready");
+                    }
+                  }
                 }}
                 onDelete={(id) => {
-                  setFiles(prev => prev.filter(f => f.id !== id));
-                  removeFromScope(id);
+                  if (window.confirm("Are you sure you want to delete this file? This action cannot be undone.")) {
+                    deleteFile(id);
+                    setFiles(prev => prev.filter(f => f.id !== id));
+                    removeFromScope(id);
+                  }
                 }}
                 onMove={(id, targetId) => {
                   removeFromScope(id);
                   moveFile(id, session.id, targetId);
                 }}
+                availableSessions={availableSessions}
                 onUpdateFile={(id, data) => setFiles(prev => prev.map(f => f.id === id ? { ...f, ...data } : f))}
                 onClickTag={(label) => setScopedTags(prev => { const s = new Set(prev); if (s.has(label)) s.delete(label); else s.add(label); return s; })}
               />
-            ))
-          )}
+            ) : (
+              sortedFiles.map(file => (
+                <FileCard
+                  key={file.id}
+                  file={{ ...file, path: file.path.replace("{sid}", session.id) }}
+                  isSelected={scopedIds.has(file.id)}
+                  isOverLimit={isOverLimit}
+                  isExtendedView={isExtendedView}
+                  onUpgradeClick={onUpgradeClick}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
+                  onClick={handleFileClick}
+                  onDoubleClick={handleFileDoubleClick}
+                  availableSessions={availableSessions}
+                  onRename={(id, newName) => {
+                    setFiles(prev => prev.map(f => f.id === id ? { ...f, name: newName } : f));
+                    addLogEntry(id, `[SYSTEM] Renamed file to: ${newName}`, "ev-ready");
+                  }}
+                  onDelete={(id) => {
+                    if (window.confirm("Are you sure you want to delete this file? This action cannot be undone.")) {
+                      deleteFile(id);
+                      setFiles(prev => prev.filter(f => f.id !== id));
+                      removeFromScope(id);
+                    }
+                  }}
+                  onMove={(id, targetId) => {
+                    removeFromScope(id);
+                    moveFile(id, session.id, targetId);
+                  }}
+                  onUpdateFile={(id, data) => setFiles(prev => prev.map(f => f.id === id ? { ...f, ...data } : f))}
+                  onClickTag={(label) => setScopedTags(prev => { const s = new Set(prev); if (s.has(label)) s.delete(label); else s.add(label); return s; })}
+                />
+              ))
+            )}
+          </div>
+
+          <div className="fs-footer">
+            <div className="fs-footer-label">Total Volume</div>
+            <div className="fs-footer-val">{files.length} objects · {totalMb} MB</div>
+          </div>
         </div>
 
-        <div className="fs-footer">
-          <div className="fs-footer-label">Total Volume</div>
-          <div className="fs-footer-val">{files.length} objects · {totalMb} MB</div>
-        </div>
-      </div>
+        <div className={`query-panel ${!showSidebar ? "sidebar-collapsed" : ""}`} style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+          <div className={`welcome-head ${!showTopPanel ? "collapsed" : ""}`}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" }}>
+              <button className="mobile-only-btn" onClick={() => setIsFilesDrawerOpen(true)} style={{
+                display: "none", padding: "4px 8px", borderRadius: "4px", background: "var(--blue-light)",
+                border: "1px solid var(--blue-mid)", color: "var(--blue)", fontSize: "10px", fontWeight: "600",
+                alignItems: "center", gap: "4px"
+              }}>
+                <FileIcon /> Browse Files
+              </button>
+              <div className="welcome-eyebrow">Session · {session.id}</div>
+            </div>
+            <div className="welcome-title">
+              {hasFiles ? "What do you want to know?" : "Start by adding files"}
+            </div>
+            <div className="welcome-sub">
+              {hasFiles
+                ? "Drag files from the corpus into scope, pick an operation, and run your analysis. Watch the activity stream as RLLM indexes your content."
+                : "This session has no files yet. Upload documents, videos, schemas, or images. RLLM will Remember and Learn from them automatically before you query."}
+            </div>
+            <div className="constraint-row">
+              <div className="cpill cpill-warn"><WarnIcon /> 1 GB ephemeral session</div>
+              <div className="cpill cpill-info"><ChatIcon /> Corpus-scoped queries only</div>
+              <div className="cpill cpill-ok"><CheckIcon /> SuperVector DB · local inference</div>
+            </div>
+          </div>
 
-      <div className={`query-panel ${!showSidebar ? "sidebar-collapsed" : ""}`}>
-        <div className={`welcome-head ${!showTopPanel ? "collapsed" : ""}`}>
-          <div style={{ display:"flex", alignItems:"center", gap:"10px", marginBottom:"4px" }}>
-            <button className="mobile-only-btn" onClick={() => setIsFilesDrawerOpen(true)} style={{ 
-              display: "none", padding: "4px 8px", borderRadius: "4px", background: "var(--blue-light)", 
-              border: "1px solid var(--blue-mid)", color: "var(--blue)", fontSize: "10px", fontWeight: "600",
-              alignItems: "center", gap: "4px"
-            }}>
-              <FileIcon /> Browse Files
-            </button>
-            <div className="welcome-eyebrow">Session · {session.id}</div>
-          </div>
-          <style>{`
-            @media (max-width: 820px) {
-              .mobile-only-btn { display: flex !important; }
-            }
-          `}</style>
-          <div className="welcome-title">
-            {hasFiles ? "What do you want to know?" : "Start by adding files"}
-          </div>
-          <div className="welcome-sub">
-            {hasFiles
-              ? "Drag files from the corpus into scope, pick an operation, and run your analysis. Watch the activity stream as RLLM indexes your content."
-              : "This session has no files yet. Upload documents, videos, schemas, or images. RLLM will Remember and Learn from them automatically before you query."}
-          </div>
-          <div className="constraint-row">
-            <div className="cpill cpill-warn"><WarnIcon /> 1 GB ephemeral session</div>
-            <div className="cpill cpill-info"><ChatIcon /> Corpus-scoped queries only</div>
-            <div className="cpill cpill-ok"><CheckIcon /> SuperVector DB · local inference</div>
-          </div>
-        </div>
+          <div className="workspace-body" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '20px' }}>
+            {/* File Tabs Bar */}
+            {(openFiles.length > 0 || !hasFiles) && (
+              <div className="file-tabs-bar">
+                <div 
+                  className={`file-tab ${!activeOpenFileId ? 'active' : ''}`} 
+                  onClick={() => setActiveOpenFileId(null)}
+                >
+                  <SearchIcon size={12} />
+                  <span>Main Session</span>
+                </div>
+                {openFiles.map(f => (
+                  <div 
+                    key={f.id} 
+                    className={`file-tab ${activeOpenFileId === f.id ? 'active' : ''}`}
+                    onClick={() => setActiveOpenFileId(f.id)}
+                  >
+                    <div className={`tab-icon-dot ${f.type}`} />
+                    <span>{f.name}</span>
+                    <span className="tab-close" onClick={(e) => closeFile(e, f.id)}>×</span>
+                  </div>
+                ))}
+              </div>
+            )}
 
-        <div className="workspace-body">
-            <div className="tray-layout-wrap">
+            {activeOpenFileId ? (
+              <div className="file-viewer-workspace" style={{ flex: 1, overflowY: 'auto' }}>
+                <FileViewer 
+                  file={openFiles.find(f => f.id === activeOpenFileId)} 
+                  onClose={() => setActiveOpenFileId(null)}
+                />
+              </div>
+            ) : (
+              <>
+                <div className="tray-layout-wrap" style={{ marginBottom: '20px' }}>
               <div
                 className={`tray ${trayDragOver ? "drag-over" : ""}`}
-                onDragOver={e => { e.preventDefault(); setTrayDragOver(true); }}
-                onDragLeave={() => setTrayDragOver(false)}
-                onDrop={handleTrayDrop}
+                onDragEnter={e => { e.preventDefault(); trayEnterCount.current++; setTrayDragOver(true); }}
+                onDragLeave={() => { trayEnterCount.current--; if (trayEnterCount.current <= 0) { trayEnterCount.current = 0; setTrayDragOver(false); } }}
+                onDragOver={e => { e.preventDefault(); }}
+                onDrop={(e) => { trayEnterCount.current = 0; setTrayDragOver(false); handleTrayDrop(e); }}
               >
                 <div className="tray-header">
                   <span className="tray-label">Files in scope</span>
@@ -497,8 +563,8 @@ function Session({ session, isActive, isOverLimit, sessionPct, onUpgradeClick, s
                   <div className="tray-files">
                     {scopedFiles.map(f => (
                       <div key={f.id} className="tray-chip" onClick={() => removeFromScope(f.id)}>
-                        <div className={`chip-dot chip-dot-${f.type}`}/>
-                        <span className="chip-name">{f.name.length > 20 ? f.name.slice(0,18)+"…" : f.name}</span>
+                        <div className={`chip-dot chip-dot-${f.type}`} />
+                        <span className="chip-name">{f.name.length > 20 ? f.name.slice(0, 18) + "…" : f.name}</span>
                         <span className="chip-size">{f.mb} MB</span>
                         <span className="chip-remove">×</span>
                       </div>
@@ -507,11 +573,12 @@ function Session({ session, isActive, isOverLimit, sessionPct, onUpgradeClick, s
                 )}
               </div>
 
-              <div 
+              <div
                 className={`tray tags-tray ${tagTrayDragOver ? "drag-over" : ""}`}
-                onDragOver={e => { e.preventDefault(); setTagTrayDragOver(true); }}
-                onDragLeave={() => setTagTrayDragOver(false)}
-                onDrop={handleTagTrayDrop}
+                onDragEnter={e => { e.preventDefault(); tagTrayEnterCount.current++; setTagTrayDragOver(true); }}
+                onDragLeave={() => { tagTrayEnterCount.current--; if (tagTrayEnterCount.current <= 0) { tagTrayEnterCount.current = 0; setTagTrayDragOver(false); } }}
+                onDragOver={e => { e.preventDefault(); }}
+                onDrop={(e) => { tagTrayEnterCount.current = 0; setTagTrayDragOver(false); handleTagTrayDrop(e); }}
               >
                 <div className="tray-header">
                   <span className="tray-label">Tags in scope</span>
@@ -534,106 +601,211 @@ function Session({ session, isActive, isOverLimit, sessionPct, onUpgradeClick, s
               </div>
             </div>
 
-          {!hasFiles ? (
-            <div className="query-empty-state">
-              <div className="qes-icon"><DBIcon /></div>
-              <div className="qes-title">Waiting for files</div>
-              <div className="qes-sub">Once files are added to this session, RLLM will index them and you can run semantic queries, summaries, diffs, and cross-maps.</div>
-            </div>
-          ) : (
-            <div style={{ flex:1, display:"flex", flexDirection:"column", gap:"10px", minHeight:0 }}>
-              <div className="op-dropdown-container" ref={opMenuRef}>
-                <button 
-                  className={`op-dropdown-toggle ${isOpMenuOpen ? 'active' : ''}`} 
-                  onClick={() => setIsOpMenuOpen(!isOpMenuOpen)}
-                >
-                  <div className="op-current-icon">
-                    {{ QUERY:<SearchIcon/>, SUMMARIZE:<ListIcon/>, DIFF:<DiffIcon/>, EXTRACT:<ExtractIcon/>, MAP:<MapIcon/> }[activeOp]}
-                  </div>
-                  <span>{OP_MAP[activeOp].label}</span>
-                  <ChevronIcon className={`dropdown-arrow ${isOpMenuOpen ? 'open' : ''}`} />
-                </button>
-                
-                {isOpMenuOpen && (
-                  <div className="op-dropdown-menu">
-                    {Object.entries(OP_MAP).map(([key, op]) => (
-                      <div 
-                        key={key} 
-                        className={`op-dropdown-item ${activeOp === key ? 'active' : ''}`}
-                        onClick={() => { setActiveOp(key); setIsOpMenuOpen(false); }}
-                      >
-                        <div className="op-item-icon">
-                          {{ QUERY:<SearchIcon/>, SUMMARIZE:<ListIcon/>, DIFF:<DiffIcon/>, EXTRACT:<ExtractIcon/>, MAP:<MapIcon/> }[key]}
-                        </div>
-                        <span>{op.label}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+            {!hasFiles ? (
+              <div className="query-empty-state">
+                <div className="qes-icon"><DBIcon /></div>
+                <div className="qes-title">Waiting for files</div>
+                <div className="qes-sub">Once files are added to this session, RLLM will index them and you can run semantic queries, summaries, diffs, and cross-maps.</div>
               </div>
-
-              <div className="query-input-wrap">
-                <div className="query-input-header">
-                  <span className="qih-label">input://</span>
-                  <span className="qih-op">{OP_MAP[activeOp].label}</span>
-                  <span className="qih-cursor">▊</span>
-                  <div style={{ flex: 1 }} />
-                </div>
-                <textarea
-                  className="query-textarea"
-                  placeholder={isOverLimit ? "Storage limit reached. Please upgrade to run further queries." : OP_MAP[activeOp].ph}
-                  value={queryText}
-                  onChange={e => setQueryText(e.target.value)}
-                  disabled={isOverLimit}
-                  onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && canSubmit && !isOverLimit) { setSubmitting(true); setTimeout(() => setSubmitting(false), 2000); }}}
-                />
-
-
-
-                {showBottomPanel && (
-                  <div className="stream-log" ref={streamLogRef}>
-                    {streamLog.length === 0 ? (
-                      <div className="log-entry" style={{ opacity: 0.4, justifyContent: "center", padding: "10px 0" }}>
-                        <span className="log-msg" style={{ fontSize: "9px" }}>[IDLE] Waiting for event signals...</span>
-                      </div>
-                    ) : (
-                      streamLog.map((entry, i) => (
-                        <div key={i} className="log-entry">
-                          <span className="log-ts">{entry.ts}</span>
-                          <span className="log-file">{entry.file.length > 18 ? entry.file.slice(0,16)+"…" : entry.file}</span>
-                          <span className={`log-msg ${entry.evClass}`}>{entry.msg}</span>
+            ) : (
+              <div className="query-zone" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                <div className="query-split-wrap" style={{ flex: 1, display: 'flex', gap: '20px', minHeight: 0 }}>
+                  {/* Left Column: Input and Activity */}
+                  <div className="query-input-col" style={{ flex: 1.2, display: 'flex', flexDirection: 'column', gap: '16px', minHeight: 0 }}>
+                    <div className="op-dropdown-container" ref={opMenuRef}>
+                      <button
+                        className={`op-dropdown-toggle ${isOpMenuOpen ? 'active' : ''}`}
+                        onClick={() => setIsOpMenuOpen(!isOpMenuOpen)}
+                      >
+                        <div className="op-current-icon">
+                          {{ QUERY: <SearchIcon />, SUMMARIZE: <ListIcon />, DIFF: <DiffIcon />, EXTRACT: <ExtractIcon />, MAP: <MapIcon /> }[activeOp]}
                         </div>
-                      ))
+                        <span>{OP_MAP[activeOp].label}</span>
+                        <ChevronIcon className={`dropdown-arrow ${isOpMenuOpen ? 'open' : ''}`} />
+                      </button>
+
+                      {isOpMenuOpen && (
+                        <div className="op-dropdown-menu">
+                          {Object.entries(OP_MAP).map(([key, op]) => (
+                            <div
+                              key={key}
+                              className={`op-dropdown-item ${activeOp === key ? 'active' : ''}`}
+                              onClick={() => { setActiveOp(key); setIsOpMenuOpen(false); }}
+                            >
+                              <div className="op-item-icon">
+                                {{ QUERY: <SearchIcon />, SUMMARIZE: <ListIcon />, DIFF: <DiffIcon />, EXTRACT: <ExtractIcon />, MAP: <MapIcon /> }[key]}
+                              </div>
+                              <span>{op.label}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="query-input-wrap" style={{ flex: 1.5, display: 'flex', flexDirection: 'column', minHeight: '180px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
+                      <div className="query-input-header" style={{ padding: '8px 12px', background: 'var(--surface-2)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span className="qih-label" style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--blue)', fontWeight: 600 }}>input://</span>
+                        <span className="qih-op" style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase' }}>{OP_MAP[activeOp].label}</span>
+                        <span className="qih-cursor" style={{ color: 'var(--blue)', animation: 'blink 1s infinite' }}>▊</span>
+                      </div>
+                      <textarea
+                        className="query-textarea"
+                        style={{ flex: 1, border: 'none', padding: '12px', fontSize: '14px', resize: 'none', outline: 'none', background: 'transparent' }}
+                        placeholder={isOverLimit ? "Storage limit reached. Please upgrade to run further queries." : OP_MAP[activeOp].ph}
+                        value={queryText}
+                        onChange={(e) => setQueryText(e.target.value)}
+                        disabled={isOverLimit}
+                      />
+
+                      <div className="query-actions" style={{ padding: '8px 12px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--surface-2)' }}>
+                        <div className="q-status-group" style={{ display: 'flex', gap: '16px' }}>
+                          <div className="q-stats" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span className="q-stat-label" style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>session window</span>
+                            <div className="q-stat-bar" style={{ width: '60px', height: '4px', background: 'var(--border)', borderRadius: '2px', overflow: 'hidden' }}>
+                              <div className="q-stat-fill" style={{ height: '100%', background: 'var(--blue)', width: `${sessionPct}%` }} />
+                            </div>
+                            <span className="q-stat-val" style={{ fontSize: '10px', fontWeight: 700, color: 'var(--blue)' }}>{sessionPct.toFixed(1)}%</span>
+                          </div>
+                        </div>
+                        <button
+                          className="run-query-btn"
+                          style={{
+                            padding: '6px 16px', background: 'var(--blue)', color: 'white', border: 'none',
+                            borderRadius: '4px', fontWeight: 600, fontSize: '12px', cursor: 'pointer',
+                            opacity: (!queryText.trim() || isOverLimit || isThinking) ? 0.5 : 1
+                          }}
+                          disabled={!queryText.trim() || isOverLimit || isThinking}
+                          onClick={async () => {
+                            if (!queryText.trim() || isOverLimit) return;
+                            setIsThinking(true);
+                            setChatMessages(prev => [...prev, { role: 'user', content: queryText }]);
+
+                            try {
+                              const trimmedQuery = queryText.trim();
+                              const data = await performSearch({
+                                query: trimmedQuery,
+                                mode: activeOp === 'QUERY' ? 'vector' : activeOp.toLowerCase(),
+                                field: 'content',
+                                vsId: activeVectorStoreId,
+                                fileIds: Array.from(scopedIds),
+                                tags: Array.from(scopedTags)
+                              });
+
+                              const count = data.atoms?.length || 0;
+                              const lastWord = trimmedQuery.split(' ').filter(Boolean).pop() || "query";
+                              const response = count > 0
+                                ? `RLLM Inference Result: I found ${count} relevant segments across the scoped files. Based on the file content, the term "${lastWord}" appears to be linked to ${data.atoms[0].uri}.`
+                                : `RLLM Inference Result: I couldn't find any direct matches for "${trimmedQuery}" within the current context.`;
+
+                              setChatMessages(prev => [...prev, { role: 'ai', content: response }]);
+                              addLogEntry("SYSTEM", `[RLLM] Inference complete. Found ${count} segments.`, "ev-ready");
+                              setQueryText("");
+                            } catch (err) {
+                              setChatMessages(prev => [...prev, { role: 'system', content: `Error: ${err.message}` }]);
+                            } finally {
+                              setIsThinking(false);
+                            }
+                          }}
+                        >
+                          {isThinking ? 'Processing...' : 'Run Query'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {showBottomPanel && (
+                      <div className="activity-tray" style={{ flex: 1, minHeight: '100px', display: 'flex', flexDirection: 'column', background: '#1e1e1e', borderRadius: 'var(--radius)', overflow: 'hidden', border: '1px solid #333' }}>
+                        <div className="at-header" style={{ padding: '6px 12px', background: '#252525', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div className="at-title" style={{ color: '#aaa', fontSize: '10px', fontWeight: 700, letterSpacing: '0.05em' }}>ACTIVITY STREAM</div>
+                          <div className="at-status" style={{ color: '#4ade80', fontSize: '9px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ width: '6px', height: '6px', background: '#4ade80', borderRadius: '50%', display: 'inline-block' }} /> LIVE SIGNAL
+                          </div>
+                        </div>
+                        <div className="at-list" style={{ flex: 1, overflowY: 'auto', padding: '8px', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
+                          {streamLog.length === 0 ? (
+                            <div className="at-entry" style={{ color: '#666', fontStyle: 'italic', padding: '4px' }}>
+                              [IDLE] Waiting for event signals...
+                            </div>
+                          ) : (
+                            streamLog.map((log, idx) => (
+                              <div key={idx} className="at-entry" style={{ display: 'flex', gap: '8px', padding: '2px 0' }}>
+                                <span className="at-time" style={{ color: '#555' }}>{log.ts}</span>
+                                <span className="at-name" style={{ color: '#8b5cf6' }}>{log.file}</span>
+                                <span className={`at-msg ${log.evClass}`} style={{ color: '#ccc' }}>{log.msg}</span>
+                              </div>
+                            ))
+                          )}
+                          <div ref={streamLogRef} />
+                        </div>
+                      </div>
                     )}
                   </div>
-                )}
-                <div className="query-footer">
-                  <div className="session-usage">
-                    <span>session window</span>
-                    <div className="usage-bar-track">
-                      <div className="usage-bar-fill" style={{ width: `${sessionPct.toFixed(1)}%` }}/>
+
+                  {/* Right Column: Chat Response Stream */}
+                  <div className="query-chat-col" style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#fff', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
+                    <div className="chat-header" style={{ padding: '8px 14px', background: 'var(--surface-2)', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span className="chat-header-title" style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Response Stream</span>
+                      <button 
+                        className="chat-clear-btn" 
+                        style={{ 
+                          fontSize: '10px', 
+                          background: 'rgba(37, 99, 235, 0.08)', 
+                          border: '1px solid rgba(37, 99, 235, 0.2)', 
+                          borderRadius: '4px',
+                          padding: '3px 8px',
+                          color: 'var(--blue)', 
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s'
+                        }} 
+                        onClick={() => setChatMessages([])}
+                      >
+                        Clear
+                      </button>
                     </div>
-                    <span className="usage-pct">{sessionPct.toFixed(1)}%</span>
+                    <div className="chat-messages" style={{ flex: 1, overflowY: 'auto', padding: '14px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {chatMessages.length === 0 ? (
+                        <div className="chat-empty" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', gap: '10px', opacity: 0.6 }}>
+                          <SearchIcon size={32} />
+                          <span style={{ fontSize: '13px' }}>Run a query to see RLLM inference results</span>
+                        </div>
+                      ) : (
+                        <>
+                          {chatMessages.map((msg, i) => (
+                            <div key={i} className={`chat-msg ${msg.role}`}>
+                              {msg.content}
+                            </div>
+                          ))}
+                          {isThinking && (
+                            <div className="chat-msg ai">
+                              <div className="thinking-indicator">
+                                <div className="thinking-dot" />
+                                <div className="thinking-dot" />
+                                <div className="thinking-dot" />
+                              </div>
+                            </div>
+                          )}
+                            <div ref={chatEndRef} />
+                          </>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <button className="submit-btn" disabled={!canSubmit || submitting || isOverLimit} onClick={() => { setSubmitting(true); setTimeout(() => setSubmitting(false), 2000); }}>
-                    <SendIcon />{isOverLimit ? "Limit Reached" : (submitting ? "Running…" : "Run Query")}
-                  </button>
                 </div>
-              </div>
-            </div>
-          )}
+                )}
+              </>
+            )}
           </div>
         </div>
-      </div>
 
-      <VectorSidebar 
-        isOpen={isVectorSidebarOpen} 
-        tags={scopedTags} 
-        vectors={filteredVectors}
-        onClose={() => setIsVectorSidebarOpen(false)}
-      />
+        {isVectorSidebarOpen && (
+          <VectorSidebar
+            isOpen={isVectorSidebarOpen}
+            tags={scopedTags}
+            vectors={filteredVectors}
+            onClose={() => setIsVectorSidebarOpen(false)}
+          />
+        )}
+      </div>
     </div>
   );
 }
-
-// ─── ROOT APP ─────────────────────────────────────────────────────────────────

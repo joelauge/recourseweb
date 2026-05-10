@@ -5,7 +5,7 @@ import { ActionChatIcon, MoreVerticalIcon, ChevronIcon, MoveIcon, TYPE_ICONS } f
 import TagCloud from '../TagCloud/TagCloud';
 
 export default // ─── FILE CARD COMPONENT ──────────────────────────────────────────────────────
-function FileCard({ file, onDragStart, onDragEnd, onClick, isSelected, isOverLimit, isExtendedView, onUpgradeClick, onDelete, onMove, onRename, availableSessions, onUpdateFile, onClickTag }) {
+function FileCard({ file, onDragStart, onDragEnd, onClick, onDoubleClick, isSelected, isOverLimit, isExtendedView, onUpgradeClick, onDelete, onMove, onRename, availableSessions, onUpdateFile, onClickTag }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [activeSubMenu, setActiveSubMenu] = useState(null);
@@ -76,9 +76,10 @@ function FileCard({ file, onDragStart, onDragEnd, onClick, isSelected, isOverLim
     <div
       className={`file-card type-${file.type} ${isSelected ? "selected" : ""} ${file.dragging ? "dragging" : ""} ${isExpanded ? "expanded" : ""}`}
       draggable={state === "READY"}
-      onDragStart={() => onDragStart(file)}
+      onDragStart={(e) => onDragStart(e, file)}
       onDragEnd={onDragEnd}
       onClick={() => onClick(file)}
+      onDoubleClick={() => onDoubleClick && onDoubleClick(file)}
       style={{ animationDelay: `${(file.animDelay || 0)}ms` }}
     >
       <div className="file-inner">

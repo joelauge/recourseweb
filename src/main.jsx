@@ -1,25 +1,38 @@
-import React, { useState, useEffect, useSyncExternalStore } from 'react'
+import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { createPortal } from 'react-dom'
-import { ClerkProvider } from '@clerk/clerk-react'
-import styles from './styles/landing.css?inline'
-
-import Header from './components/layout/Header'
-import MainContent from './components/layout/MainContent'
-import Footer from './components/layout/Footer'
-
-const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
+import landingStyles from './styles/landing.css?inline'
+import indexStyles from './styles/index.css?inline'
+import { ModularHost } from './ModularHost'
 
 // ─── Global Registry for Modular Portals ─────────────────────
 const registry = {
-  state: { header: null, site: null, footer: null },
+  state: { 
+    header: null, 
+    site: null, 
+    footer: null, 
+    view: window.location.pathname === '/dashboard' ? 'app' : 'landing' 
+  },
   listeners: new Set(),
   subscribe(listener) {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   },
   register(type, node) {
+    console.log(`[Registry] Registering ${type}`);
     this.state = { ...this.state, [type]: node };
+    this.listeners.forEach(l => l());
+  },
+  setView(view) {
+    console.log(`[Registry] Switching view to: ${view}`);
+    this.state = { ...this.state, view };
+    const root = document.documentElement;
+    if (view === 'app') {
+      root.classList.add('app-active');
+      document.body.classList.add('app-active');
+    } else {
+      root.classList.remove('app-active');
+      document.body.classList.remove('app-active');
+    }
     this.listeners.forEach(l => l());
   },
   getSnapshot() {
@@ -27,16 +40,10 @@ const registry = {
   }
 };
 
-function ModularHost() {
-  const roots = useSyncExternalStore(registry.subscribe.bind(registry), registry.getSnapshot.bind(registry));
-  
-  return (
-    <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
-      {roots.header && createPortal(<Header rootNode={roots.header} />, roots.header)}
-      {roots.site && createPortal(<MainContent rootNode={roots.site} />, roots.site)}
-      {roots.footer && createPortal(<Footer rootNode={roots.footer} />, roots.footer)}
-    </ClerkProvider>
-  );
+// Apply initial body classes
+if (registry.state.view === 'app') {
+  document.documentElement.classList.add('app-active');
+  document.body.classList.add('app-active');
 }
 
 // ─── Custom Element Definitions ──────────────────────────────
@@ -44,21 +51,37 @@ function defineModularElement(tagName, type) {
   class ModularElement extends HTMLElement {
     constructor() {
       super();
-      this.attachShadow({ mode: 'open' });
+      const shadow = this.attachShadow({ mode: 'open' });
       
       const styleSheet = new CSSStyleSheet();
+      // Transform body.app-active selectors to work inside shadow DOM
+      const shadowIndexStyles = indexStyles.replace(/body\.app-active\s+/g, ':host-context(body.app-active) ');
+      const shadowLandingStyles = landingStyles.replace(/body\.app-active\s+/g, ':host-context(body.app-active) ');
+      
       styleSheet.replaceSync(`
         :host { display: block; width: 100%; position: relative; }
-        ${styles}
+        :host([part="site"]) { min-height: 100vh; }
+        :host-context(body.app-active)[part="site"] { height: 100%; min-height: 100%; overflow: hidden; }
+        ${shadowLandingStyles}
+        ${shadowIndexStyles}
       `);
-      this.shadowRoot.adoptedStyleSheets = [styleSheet];
+      shadow.adoptedStyleSheets = [styleSheet];
+      console.log(`[CustomElement] Created ${tagName} shadow root`);
     }
     connectedCallback() {
-      registry.register(type, this.shadowRoot);
+      this.setAttribute('part', type);
+      // Ensure shadowRoot is ready before registering
+      if (this.shadowRoot) {
+        registry.register(type, this.shadowRoot);
+      } else {
+        console.error(`[CustomElement] ${tagName} missing shadowRoot on connect!`);
+      }
     }
   }
+  
   if (!customElements.get(tagName)) {
     customElements.define(tagName, ModularElement);
+    console.log(`[CustomElement] Defined ${tagName}`);
   }
 }
 
@@ -67,7 +90,22 @@ defineModularElement('knowdrive-site', 'site');
 defineModularElement('knowdrive-footer', 'footer');
 
 // ─── Launch the Host Engine ──────────────────────────────────
-const hostContainer = document.createElement('div');
-hostContainer.style.display = 'none';
-document.body.appendChild(hostContainer);
-ReactDOM.createRoot(hostContainer).render(<ModularHost />);
+const HOST_ID = '__knowdrive_host_root__';
+let hostContainer = document.getElementById(HOST_ID);
+
+if (!hostContainer) {
+  hostContainer = document.createElement('div');
+  hostContainer.id = HOST_ID;
+  hostContainer.style.display = 'none';
+  document.body.appendChild(hostContainer);
+}
+
+const root = ReactDOM.createRoot(hostContainer);
+root.render(<ModularHost registry={registry} />);
+
+// HMR Cleanup
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    root.unmount();
+  });
+}

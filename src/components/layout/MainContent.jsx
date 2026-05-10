@@ -104,11 +104,9 @@ export default function MainContent({ rootNode }) {
       const node = rootNode || document;
       node.querySelector(e.detail.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
-    const handleWaitlist = () => setIsWaitlistOpen(true);
 
     window.addEventListener('kd-theme-change', handleTheme);
     window.addEventListener('kd-scroll-to', handleScroll);
-    window.addEventListener('kd-open-waitlist', handleWaitlist);
 
     // Forward scroll events from the host to the global window for the header
     const host = rootNode?.host;
@@ -125,7 +123,6 @@ export default function MainContent({ rootNode }) {
     return () => {
       window.removeEventListener('kd-theme-change', handleTheme);
       window.removeEventListener('kd-scroll-to', handleScroll);
-      window.removeEventListener('kd-open-waitlist', handleWaitlist);
       if (host) host.removeEventListener('scroll', onHostScroll);
     };
   }, [rootNode]);
@@ -157,8 +154,8 @@ export default function MainContent({ rootNode }) {
               <h1 className="l-hero-title animate-in delay-1">The world's only<br /><span className="gradient-text">unlimited collaborative context window.</span></h1>
               <p className="l-hero-sub animate-in delay-2">Scale and share 1 GB to 1 PB of persistent context memory across your whole team. It's Dropbox for Inference. Feed your models unlimited knowledge—pay only for what you use.</p>
               <div className="l-hero-ctas animate-in delay-3">
-                <button className="btn-primary large" onClick={() => setIsWaitlistOpen(true)}>Start for $15 / month</button>
-                <button className="btn-ghost large" onClick={() => setIsWaitlistOpen(true)}>Open App →</button>
+                <button className="btn-primary large" onClick={() => window.dispatchEvent(new CustomEvent('kd-open-app'))}>Start for $15 / month</button>
+                <button className="btn-ghost large" onClick={() => window.dispatchEvent(new CustomEvent('kd-open-app'))}>Open App →</button>
               </div>
             </div>
             <div className="l-hero-visual animate-in delay-2">
@@ -239,7 +236,7 @@ export default function MainContent({ rootNode }) {
             </div>
 
             <div className="pricing-cta">
-              <button className="subscribe-btn" onClick={() => setIsWaitlistOpen(true)}>
+              <button className="subscribe-btn" onClick={() => window.dispatchEvent(new CustomEvent('kd-open-app'))}>
                 <span>Subscribe — {formatUSD(isAnnual ? annual : monthly)} / {isAnnual ? 'year' : 'month'}</span>
               </button>
               <div className="stripe-notice">Secured by <span className="stripe-icon">stripe</span> · Cancel anytime · 99.99% SLA</div>
@@ -294,8 +291,8 @@ export default function MainContent({ rootNode }) {
             <h2 className="l-cta-title">Start building with<br /><span className="gradient-text">infinite context</span></h2>
             <p className="l-cta-sub">Your first gigabyte is $15. Scale to a petabyte with a single API call. No migrations. No re-indexing. No surprises.</p>
             <div className="l-cta-btns">
-              <button className="btn-primary large" onClick={() => setIsWaitlistOpen(true)}>Get Started — $15 / mo</button>
-              <button className="btn-ghost large" onClick={() => setIsWaitlistOpen(true)}>Open App →</button>
+              <button className="btn-primary large" onClick={() => window.dispatchEvent(new CustomEvent('kd-open-app'))}>Get Started — $15 / mo</button>
+              <button className="btn-ghost large" onClick={() => window.dispatchEvent(new CustomEvent('kd-open-app'))}>Open App →</button>
             </div>
           </div>
         </div>

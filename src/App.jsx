@@ -4,6 +4,7 @@ import './styles/index.css';
 
 import Session from './components/Session/Session';
 import UpgradeModal from './components/UpgradeModal/UpgradeModal';
+import { useKnowDB } from './hooks/useKnowDB';
 import { GEN_ID, createMockStream } from './utils/mockData';
 import { FILE_STATES, OP_MAP, SEED_FILES, STORE_FILES } from './constants';
 import { LogoSVG, DBIcon, UploadIcon, SearchIcon, ListIcon, DiffIcon, ExtractIcon, MapIcon, InfoIcon, MoreVerticalIcon, ActionChatIcon, FileIcon, PlusIcon, SidebarToggleIcon, TopPanelToggleIcon, BottomPanelToggleIcon, MicIcon, ImageIcon, VideoIcon, RightSidebarToggleIcon, ChevronIcon, CheckIcon, SettingsIcon, UserPlusIcon, CameraIcon, AudioRecordIcon, VideoRecordIcon, XCircleIcon, PlayIcon, EyeIcon } from './components/Icons';
@@ -11,33 +12,31 @@ const STORAGE_LIMIT_MB = 1024;
 
 export default function App() {
   const [isLimitModalOpen, setIsLimitModalOpen] = useState(false);
-  const [showSidebar, setShowSidebar] = useState(true);
-  const [showTopPanel, setShowTopPanel] = useState(true);
-  const [showBottomPanel, setShowBottomPanel] = useState(true);
-  const [isVectorSidebarOpen, setIsVectorSidebarOpen] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(() => {
+    const saved = localStorage.getItem('kd-show-sidebar');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+  const [showTopPanel, setShowTopPanel] = useState(() => {
+    const saved = localStorage.getItem('kd-show-top-panel');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+  const [showBottomPanel, setShowBottomPanel] = useState(() => {
+    const saved = localStorage.getItem('kd-show-bottom-panel');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+  const [isVectorSidebarOpen, setIsVectorSidebarOpen] = useState(() => {
+    const saved = localStorage.getItem('kd-show-vector-sidebar');
+    return saved !== null ? JSON.parse(saved) : false;
+  });
 
-  const makeSession = (withFiles = false) => {
-    const id = GEN_ID();
-    return {
-      id,
-      label: id.replace("-" + new Date().getFullYear(), ""),
-      hasActivity: withFiles,
-      hasSeedFiles: withFiles,
-      files: withFiles
-        ? SEED_FILES.map((f, i) => ({
-            ...f,
-            path: f.path.replace("{sid}", id),
-            addedAt: Date.now() - (100 - i) * 1000,
-            state: "QUEUED",
-            progress: 0,
-            logs: [],
-            animDelay: i * 60,
-          }))
-        : [],
-    };
-  };
+  const makeSession = (id, label) => ({
+    id,
+    label,
+    files: [], // Start empty, wait for dbFiles
+    isNew: false
+  });
 
-  const [sessions, setSessions] = useState([makeSession(true)]);
+  const [sessions, setSessions] = useState([makeSession(GEN_ID(), 'Main Session')]);
   const [activeId, setActiveId] = useState(() => sessions[0].id);
   const [searchMode, setSearchMode] = useState('TEXT');
   const [searchValue, setSearchValue] = useState('');
@@ -54,6 +53,23 @@ export default function App() {
   const mediaRecorderRef = useRef(null);
   const mediaChunksRef = useRef([]);
   const videoPreviewRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const gainNodeRef = useRef(null);
+  const recordingStartTimeRef = useRef(0);
+
+  // Persist layout settings
+  useEffect(() => {
+    localStorage.setItem('kd-show-sidebar', JSON.stringify(showSidebar));
+  }, [showSidebar]);
+  useEffect(() => {
+    localStorage.setItem('kd-show-top-panel', JSON.stringify(showTopPanel));
+  }, [showTopPanel]);
+  useEffect(() => {
+    localStorage.setItem('kd-show-bottom-panel', JSON.stringify(showBottomPanel));
+  }, [showBottomPanel]);
+  useEffect(() => {
+    localStorage.setItem('kd-show-vector-sidebar', JSON.stringify(isVectorSidebarOpen));
+  }, [isVectorSidebarOpen]);
 
   // Sync recording stream to video element
   useEffect(() => {
@@ -108,24 +124,88 @@ export default function App() {
   async function startAudioRecord() {
     setIsMediaMenuOpen(false);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mr = new MediaRecorder(stream);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: 48000
+        }
+      });
+
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
+      const source = audioContext.createMediaStreamSource(stream);
+
+      // High-pass filter to remove low-frequency rumble (< 100Hz)
+      const highpass = audioContext.createBiquadFilter();
+      highpass.type = 'highpass';
+      highpass.frequency.value = 100;
+
+      // Low-pass filter to remove high-frequency hiss (> 7000Hz)
+      const lowpass = audioContext.createBiquadFilter();
+      lowpass.type = 'lowpass';
+      lowpass.frequency.value = 7000;
+
+      // Dynamics compressor to normalize voice levels
+      const compressor = audioContext.createDynamicsCompressor();
+      compressor.threshold.setValueAtTime(-24, audioContext.currentTime);
+      compressor.knee.setValueAtTime(40, audioContext.currentTime);
+      compressor.ratio.setValueAtTime(12, audioContext.currentTime);
+      compressor.attack.setValueAtTime(0, audioContext.currentTime);
+      compressor.release.setValueAtTime(0.25, audioContext.currentTime);
+
+      const gainNode = audioContext.createGain();
+      const destination = audioContext.createMediaStreamDestination();
+
+      source.connect(highpass);
+      highpass.connect(lowpass);
+      lowpass.connect(compressor);
+      compressor.connect(gainNode);
+      gainNode.connect(destination);
+
+      const mr = new MediaRecorder(destination.stream);
       mediaChunksRef.current = [];
       mr.ondataavailable = e => mediaChunksRef.current.push(e.data);
       mr.onstop = () => {
         const blob = new Blob(mediaChunksRef.current, { type: 'audio/webm' });
         addSearchAttachment(blob, 'audio', 'recording.webm');
         stream.getTracks().forEach(t => t.stop());
+        audioContext.close();
         setIsRecordingAudio(false);
       };
+      
       mr.start();
       mediaRecorderRef.current = mr;
+      audioContextRef.current = audioContext;
+      gainNodeRef.current = gainNode;
+      recordingStartTimeRef.current = Date.now();
       setIsRecordingAudio(true);
-    } catch { setIsRecordingAudio(false); }
+    } catch (err) { 
+      console.error("Failed to start audio recording", err);
+      setIsRecordingAudio(false); 
+    }
   }
 
   function stopAudioRecord() {
-    mediaRecorderRef.current?.stop();
+    if (!mediaRecorderRef.current || !isRecordingAudio) return;
+    
+    const elapsed = Date.now() - recordingStartTimeRef.current;
+    const minDuration = 8000; // 8 seconds
+
+    if (elapsed < minDuration) {
+      // Mute the input and wait for the remainder of the 8 seconds
+      if (gainNodeRef.current && audioContextRef.current) {
+        gainNodeRef.current.gain.linearRampToValueAtTime(0, audioContextRef.current.currentTime + 0.1);
+      }
+      // Keep UI state as recording (or maybe "Processing...")
+      setTimeout(() => {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+          mediaRecorderRef.current.stop();
+        }
+      }, minDuration - elapsed);
+    } else {
+      mediaRecorderRef.current.stop();
+    }
   }
 
   async function startVideoRecord() {
@@ -153,44 +233,122 @@ export default function App() {
     mediaRecorderRef.current?.stop();
   }
 
-  const [vectorStores, setVectorStores] = useState([
-    { id: 'vs-primary', name: 'Primary Brain', description: 'Main knowledge base for all indexed files.' },
-    { id: 'vs-research', name: 'Research Lab', description: 'Experimental vectors for R&D projects.' },
-    { id: 'vs-archive', name: 'Cold Archive', description: 'Long-term storage for archived documents.' },
-  ]);
-  const [activeVectorStore, setActiveVectorStore] = useState(() =>
-    ({ id: 'vs-primary', name: 'Primary Brain', description: 'Main knowledge base for all indexed files.' })
-  );
+  const [activeVectorStore, setActiveVectorStore] = useState({ id: 'global', name: 'Global Corpus', description: 'Universal file storage' });
   const [isVSMenuOpen, setIsVSMenuOpen] = useState(false);
   const [isVSSwitching, setIsVSSwitching] = useState(false);
+
+  const {
+    vectorStores,
+    files: dbFiles,
+    fileStatuses,
+    searchResults,
+    performSearch,
+    uploadFile,
+    fetchFiles,
+    fetchVectorStores,
+    deleteFile
+  } = useKnowDB({ selectedVectorStore: activeVectorStore?.id });
+
+  // Sync real files from backend to the active session
+  useEffect(() => {
+    if (dbFiles && dbFiles.length > 0) {
+      setSessions(prev => {
+        // Smarter sync: Identify which files are already in ANY session
+        const allCurrentFiles = prev.flatMap(s => s.files);
+        const updatedSessions = prev.map(s => {
+          const sessionFiles = s.files;
+          
+          // Files that belong to THIS session
+          const filesToKeep = [];
+          
+          // For each file in the DB, decide if it belongs here
+          dbFiles.forEach(f => {
+            const existingInAny = allCurrentFiles.find(cf => cf.path === f.filename || cf.id === f.id);
+            const isNew = !existingInAny && (Date.now() - (f.created_at * 1000) < 300000);
+            
+            const stats = [
+              { v: f.chunk_count || '?', k: "CHUNKS" },
+              { v: f.bytes ? (f.bytes / (1024 * 1024)).toFixed(1) : '0', k: "MB" },
+              { v: f.status.toUpperCase(), k: "STATE" }
+            ];
+            if (f.created_at) {
+              const date = new Date(f.created_at * 1000);
+              stats.push({ v: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), k: "INDEXED" });
+            }
+
+            const tags = [];
+            if (f.mime_type) {
+              const type = f.mime_type.split('/')[0];
+              const color = { image: 'violet', video: 'red', audio: 'amber', text: 'blue' }[type] || 'gray';
+              tags.push([color, f.mime_type.split('/').pop().toUpperCase()]);
+            }
+            if (f.tags) {
+              f.tags.forEach(t => {
+                if (!t.startsWith('mime:') && !t.startsWith('charset:')) {
+                  tags.push(['teal', t.toUpperCase()]);
+                }
+              });
+            }
+
+            const fileObj = {
+              ...(existingInAny || {}),
+              id: f.id,
+              name: f.filename,
+              path: f.filename,
+              isNew: isNew || existingInAny?.isNew,
+              type: f.mime_type?.startsWith('video') ? 'vid' : 
+                    f.mime_type?.startsWith('audio') ? 'audio' : 
+                    f.mime_type?.startsWith('image') ? 'img' : 'vec',
+              mb: f.bytes ? Math.round(f.bytes / (1024 * 1024)) : 0,
+              state: f.status === 'processed' ? 'READY' : f.status === 'processing' ? 'LEARNING' : 'QUEUED',
+              progress: f.status === 'processed' ? 100 : 0,
+              tags: tags.length > 0 ? tags : [['gray', 'UNTAGGED']],
+              stats: stats,
+              details: {
+                id: f.id,
+                purpose: f.purpose,
+                mime: f.mime_type,
+                vs: f.vector_store_id || 'global'
+              }
+            };
+
+            // If it's already in this session, or it's brand new and this is the active session
+            const isInThisSession = s.files.some(cf => cf.path === f.filename || cf.id === f.id);
+            const isAssignedElsewhere = !isInThisSession && allCurrentFiles.some(cf => (cf.path === f.filename || cf.id === f.id) && !s.files.includes(cf));
+            
+            if (isInThisSession || (!isAssignedElsewhere && s.id === activeId)) {
+              filesToKeep.push(fileObj);
+            }
+          });
+          
+          return { ...s, files: filesToKeep };
+        });
+        
+        return updatedSessions;
+      });
+    }
+  }, [dbFiles, activeId]);
+
   const [managingVS, setManagingVS] = useState(null);
   const [vsEditName, setVsEditName] = useState('');
   const [vsEditDesc, setVsEditDesc] = useState('');
+
+  // Auto-fetch on mount and vector store change
+  useEffect(() => {
+    fetchVectorStores();
+    fetchFiles();
+  }, [fetchVectorStores, fetchFiles, activeVectorStore?.id]);
 
   const switchVectorStore = async (vs) => {
     if (vs.id === activeVectorStore?.id) { setIsVSMenuOpen(false); return; }
     setIsVSMenuOpen(false);
     setIsVSSwitching(true);
-    // Simulate POST /api/vector-store/connect
-    await new Promise(resolve => setTimeout(resolve, 1400));
-    // Load the store's file corpus into the active session
-    const rawFiles = STORE_FILES[vs.id] ?? SEED_FILES;
-    const sessionId = sessions.find(s => s.id === activeId)?.id ?? activeId;
-    const storeFiles = rawFiles.map((f, i) => ({
-      ...f,
-      path: f.path.replace('{sid}', sessionId),
-      addedAt: f.addedAt ?? (Date.now() - (100 - i) * 1000),
-      state: 'QUEUED',
-      progress: 0,
-      logs: [],
-      animDelay: i * 60,
-    }));
-    setSessions(prev => prev.map(s =>
-      s.id === activeId
-        ? { ...s, files: storeFiles, hasSeedFiles: true, hasActivity: true, vsId: vs.id }
-        : s
-    ));
+    
+    // The hook will trigger fetchFiles when activeVectorStore.id changes
     setActiveVectorStore(vs);
+    
+    // Brief delay for UX feel
+    await new Promise(resolve => setTimeout(resolve, 600));
     setIsVSSwitching(false);
   };
 
@@ -405,6 +563,17 @@ export default function App() {
                   value={searchValue}
                   onChange={e => setSearchValue(e.target.value)}
                   onPaste={handleSearchPaste}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      performSearch({
+                        query: searchValue,
+                        mode: searchMode === 'TEXT' ? 'fts' : 'vector',
+                        field: searchMode.toLowerCase(),
+                        file: searchAttachments.length > 0 ? searchAttachments[0].blob : null,
+                        vsId: activeVectorStore.id
+                      });
+                    }
+                  }}
                 />
                 <div className="fs-search-toggles">
                   <button className={`fs-search-toggle-btn ${searchMode === 'TEXT' ? 'active' : ''}`} onClick={() => setSearchMode('TEXT')}><SearchIcon size={12} /></button>
@@ -438,6 +607,13 @@ export default function App() {
                         <span className="attach-icon-wrap" style={{ color: '#2563eb' }}><VideoIcon size={12} /></span>
                       )}
                       <span className="attach-name">{a.name.length > 18 ? a.name.slice(0, 16) + '…' : a.name}</span>
+                      <button 
+                        className="attach-ingest-btn" 
+                        onClick={(e) => { e.stopPropagation(); uploadFile(a.blob, a.name); removeSearchAttachment(a.id); }}
+                        title="Save to Corpus"
+                      >
+                        <UploadIcon size={12} />
+                      </button>
                       <button className="attach-remove" onClick={() => removeSearchAttachment(a.id)}>
                         <XCircleIcon size={12} />
                       </button>
@@ -506,6 +682,18 @@ export default function App() {
             {isVSMenuOpen && (
               <div className="vs-menu">
                 <div className="vs-menu-header">Select Vector Store</div>
+                {/* Always show Global Corpus */}
+                <div 
+                  className={`vs-menu-item ${activeVectorStore.id === 'global' ? 'active' : ''}`}
+                  onClick={() => switchVectorStore({ id: 'global', name: 'Global Corpus', description: 'Universal file storage' })}
+                >
+                  <div className="vs-item-icon"><DBIcon size={12} /></div>
+                  <div className="vs-item-info">
+                    <div className="vs-item-name">Global Corpus</div>
+                    <div className="vs-item-type">Universal file storage</div>
+                  </div>
+                </div>
+                
                 {vectorStores.map(vs => (
                   <div 
                     key={vs.id} 
@@ -562,6 +750,11 @@ export default function App() {
               }}
               moveFile={moveFile}
               onUpgradeClick={() => setIsLimitModalOpen(true)} 
+              performSearch={performSearch}
+              searchResults={searchResults}
+              uploadFile={uploadFile}
+              deleteFile={deleteFile}
+              fileStatuses={fileStatuses}
             />
           ))}
         </div>

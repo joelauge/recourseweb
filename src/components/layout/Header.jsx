@@ -76,7 +76,7 @@ export default function Header({ rootNode }) {
               <button className="theme-toggle" onClick={toggleTheme}>
                 {isDark ? <SunIcon /> : <MoonIcon />}
               </button>
-              <button className="btn-ghost" onClick={openWaitlist}>Sign In</button>
+              <button className="btn-ghost" onClick={() => window.dispatchEvent(new CustomEvent('kd-open-app'))}>Sign In</button>
               <button className="btn-primary" onClick={openWaitlist}>Get Started</button>
             </div>
           </div>

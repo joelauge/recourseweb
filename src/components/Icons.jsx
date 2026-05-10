@@ -39,6 +39,9 @@ export const AudioRecordIcon = ({size}) => <Icon d={<><circle cx="12" cy="12" r=
 export const VideoRecordIcon = ({size}) => <Icon d={<><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/><circle cx="6" cy="12" r="1.5" fill="currentColor" stroke="none"/></>} size={size || 14}/>;
 export const XCircleIcon = ({size}) => <Icon d={<><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></>} size={size || 14}/>;
 export const PlayIcon = ({size}) => <Icon d={<polygon points="5 3 19 12 5 21 5 3" fill="currentColor" stroke="none"/>} size={size || 14}/>;
+export const StopIcon = ({size}) => <Icon d={<rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" stroke="none"/>} size={size || 14}/>;
+export const MinusIcon = ({size}) => <Icon d={<line x1="5" y1="12" x2="19" y2="12"/>} size={size || 14}/>;
+export const MaximizeIcon = ({size}) => <Icon d={<><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></>} size={size || 14}/>;
 export const EyeIcon = ({size}) => <Icon d={<><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></>} size={size || 14}/>;
 
 export const SidebarToggleIcon = ({ active }) => (

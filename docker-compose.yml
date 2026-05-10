@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  knowdb:
+    build:
+      context: ./knowdb/multi-modal-store
+      dockerfile: Dockerfile
+    image: knowdrive/backend:latest
+    container_name: knowdb
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "3003:3000"
+    environment:
+      KNOWDB_LOG_LEVEL: info,ort=warn,lance=warn,zenoh=warn,whisper=warn
+      KNOWDB_MODELS_DIR: /opt/knowdb/models
+      KNOWDB_STORE_DIR: /opt/knowdb/data
+      KNOWDB_MOCK_ML: "true"
+    volumes:
+      - ./knowdb/multi-modal-store/.knowdb:/opt/knowdb/data
+      - ./knowdb/multi-modal-store/models:/opt/knowdb/models
+    networks:
+      - knowdrive-net
+
+  collabora:
+    image: collabora/code:latest
+    container_name: collabora
+    ports:
+      - "9980:9980"
+    environment:
+      - "extra_params=--o:ssl.enable=false --o:ssl.termination=false --o:admin_console.username=admin --o:admin_console.password=admin"
+      - "domain=.*"
+    cap_add:
+      - MKNOD
+    networks:
+      - knowdrive-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+networks:
+  knowdrive-net:
+    driver: bridge

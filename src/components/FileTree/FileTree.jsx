@@ -65,7 +65,7 @@ const TreeNode = ({ node, level = 0, ...props }) => {
   );
 };
 
-const FileNode = ({ file, onFileClick, onDragStart, onDragEnd, onDelete, onRename, onMove, availableSessions, onUpdateFile, onClickTag }) => {
+const FileNode = ({ file, onFileClick, onFileDoubleClick, onDragStart, onDragEnd, onDelete, onRename, onMove, availableSessions, onUpdateFile, onClickTag }) => {
   const Icon = TYPE_ICONS[file.type] || TYPE_ICONS.raw;
   const [showMenu, setShowMenu] = useState(false);
   const [menuPos, setMenuPos] = useState({ top: 0, right: 0 });
@@ -94,8 +94,9 @@ const FileNode = ({ file, onFileClick, onDragStart, onDragEnd, onDelete, onRenam
     <div 
       className={`tree-file ${file.dragging ? 'dragging' : ''}`}
       onClick={() => onFileClick(file)}
+      onDoubleClick={() => onFileDoubleClick && onFileDoubleClick(file)}
       draggable
-      onDragStart={() => onDragStart(file)}
+      onDragStart={(e) => onDragStart(e, file)}
       onDragEnd={onDragEnd}
     >
       <div className="tree-file-icon">
@@ -149,7 +150,7 @@ const FileNode = ({ file, onFileClick, onDragStart, onDragEnd, onDelete, onRenam
   );
 };
 
-export default function FileTree({ files, onFileClick, onDragStart, onDragEnd, onDelete, onRename, onMove, availableSessions, onUpdateFile, onClickTag }) {
+export default function FileTree({ files, onFileClick, onFileDoubleClick, onDragStart, onDragEnd, onDelete, onRename, onMove, availableSessions, onUpdateFile, onClickTag }) {
   const tree = useMemo(() => buildFileTree(files), [files]);
   
   return (
@@ -157,6 +158,7 @@ export default function FileTree({ files, onFileClick, onDragStart, onDragEnd, o
       <TreeNode 
         node={tree} 
         onFileClick={onFileClick} 
+        onFileDoubleClick={onFileDoubleClick}
         onDragStart={onDragStart} 
         onDragEnd={onDragEnd}
         onDelete={onDelete}
